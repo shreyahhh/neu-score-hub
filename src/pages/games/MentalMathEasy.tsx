@@ -1,150 +1,212 @@
-"use client";
-
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Calculator, Play } from 'lucide-react';
 import { Timer } from '@/components/game/Timer';
 import { ProgressBar } from '@/components/game/ProgressBar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { useScoringConfig } from '@/context/ScoringConfigContext';
 import { calculateMentalMathScore } from '@/lib/scoring';
-import { saveGameResult } from '@/lib/supabase';
-import { toast } from 'sonner';
-import { Calculator, Play, CheckCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
-interface Question {
-  num1: number;
-  num2: number;
-  operator: '+' | '-' | '*';
-  correctAnswer: number;
-}
+// Fixed problem sequence: Race from 100 to 200
+const PROBLEMS = [
+  { id: 1, operand: 7, operator: '+' as const, correctAnswer: 107 },
+  { id: 2, operand: 9, operator: '+' as const, correctAnswer: 116 },
+  { id: 3, operand: 13, operator: '-' as const, correctAnswer: 103 },
+  { id: 4, operand: 8, operator: '+' as const, correctAnswer: 111 },
+  { id: 5, operand: 11, operator: '+' as const, correctAnswer: 122 },
+  { id: 6, operand: 12, operator: '-' as const, correctAnswer: 110 },
+  { id: 7, operand: 20, operator: '+' as const, correctAnswer: 130 },
+  { id: 8, operand: 15, operator: '+' as const, correctAnswer: 145 },
+  { id: 9, operand: 17, operator: '+' as const, correctAnswer: 162 },
+  { id: 10, operand: 18, operator: '+' as const, correctAnswer: 180 },
+  { id: 11, operand: 20, operator: '+' as const, correctAnswer: 200 },
+];
+
+type GameState = 'instructions' | 'playing' | 'results';
 
 const MentalMathEasy = () => {
   const { config } = useScoringConfig();
-  const [gameState, setGameState] = useState<'ready' | 'playing' | 'finished'>('ready');
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [gameState, setGameState] = useState<GameState>('instructions');
+  const [currentProblem, setCurrentProblem] = useState(0);
+  const [currentBalance, setCurrentBalance] = useState(100);
   const [userAnswer, setUserAnswer] = useState('');
-  const [answers, setAnswers] = useState<{ correct: boolean; time: number }[]>([]);
-  const [startTime, setStartTime] = useState(0);
-  const [questionStartTime, setQuestionStartTime] = useState(0);
+  const [responses, setResponses] = useState<any[]>([]);
+  const [questionStartTime, setQuestionStartTime] = useState<number>(0);
+  const [gameStartTime, setGameStartTime] = useState<number>(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  const TOTAL_QUESTIONS = 10;
-  const MAX_TIME = 180; // 3 minutes
-
-  // Generate random question
-  const generateQuestion = (): Question => {
-    const operators: ('+' | '-' | '*')[] = ['+', '-', '*'];
-    const operator = operators[Math.floor(Math.random() * operators.length)];
-    
-    let num1, num2, correctAnswer;
-    
-    if (operator === '*') {
-      num1 = Math.floor(Math.random() * 12) + 1;
-      num2 = Math.floor(Math.random() * 12) + 1;
-      correctAnswer = num1 * num2;
-    } else if (operator === '+') {
-      num1 = Math.floor(Math.random() * 50) + 10;
-      num2 = Math.floor(Math.random() * 50) + 10;
-      correctAnswer = num1 + num2;
-    } else {
-      num2 = Math.floor(Math.random() * 30) + 10;
-      correctAnswer = Math.floor(Math.random() * 50) + 10;
-      num1 = correctAnswer + num2;
-    }
-
-    return { num1, num2, operator, correctAnswer };
-  };
+  const timePerQuestion = 5; // Default 5 seconds
 
   const startGame = () => {
-    const newQuestions = Array.from({ length: TOTAL_QUESTIONS }, () => generateQuestion());
-    setQuestions(newQuestions);
     setGameState('playing');
-    setCurrentQuestion(0);
-    setAnswers([]);
+    setCurrentProblem(0);
+    setCurrentBalance(100);
+    setResponses([]);
     setUserAnswer('');
-    setStartTime(Date.now());
+    setGameStartTime(Date.now());
     setQuestionStartTime(Date.now());
+    setIsTimerRunning(true);
   };
 
-  const submitAnswer = () => {
+  const handleSubmit = () => {
     if (!userAnswer.trim()) return;
+    
+    const problem = PROBLEMS[currentProblem];
+    const timeTaken = (Date.now() - questionStartTime) / 1000;
+    const userNum = parseInt(userAnswer) || 0;
+    const isCorrect = userNum === problem.correctAnswer;
 
-    const currentQ = questions[currentQuestion];
-    const isCorrect = parseInt(userAnswer) === currentQ.correctAnswer;
-    const timeSpent = (Date.now() - questionStartTime) / 1000;
+    const response = {
+      problemId: problem.id,
+      operand: problem.operand,
+      operator: problem.operator,
+      previousBalance: currentBalance,
+      correctAnswer: problem.correctAnswer,
+      userAnswer: userNum,
+      isCorrect,
+      timeTaken,
+      maxAllowedTime: timePerQuestion,
+    };
 
-    const newAnswers = [...answers, { correct: isCorrect, time: timeSpent }];
-    setAnswers(newAnswers);
+    const newResponses = [...responses, response];
+    setResponses(newResponses);
 
-    if (currentQuestion < TOTAL_QUESTIONS - 1) {
-      setCurrentQuestion(currentQuestion + 1);
+    if (currentProblem < PROBLEMS.length - 1) {
+      setCurrentProblem(currentProblem + 1);
+      setCurrentBalance(problem.correctAnswer);
       setUserAnswer('');
       setQuestionStartTime(Date.now());
+      setIsTimerRunning(false);
+      setTimeout(() => setIsTimerRunning(true), 100);
     } else {
-      finishGame(newAnswers);
+      finishGame(newResponses);
     }
   };
 
-  const finishGame = async (finalAnswers: { correct: boolean; time: number }[]) => {
-    setGameState('finished');
-    
-    const totalTime = (Date.now() - startTime) / 1000;
-    const correct = finalAnswers.filter(a => a.correct).length;
-    const percentError = ((TOTAL_QUESTIONS - correct) / TOTAL_QUESTIONS) * 100;
+  const handleTimeout = () => {
+    const problem = PROBLEMS[currentProblem];
+    const response = {
+      problemId: problem.id,
+      operand: problem.operand,
+      operator: problem.operator,
+      previousBalance: currentBalance,
+      correctAnswer: problem.correctAnswer,
+      userAnswer: 0,
+      isCorrect: false,
+      timeTaken: timePerQuestion,
+      maxAllowedTime: timePerQuestion,
+    };
 
+    const newResponses = [...responses, response];
+    setResponses(newResponses);
+
+    if (currentProblem < PROBLEMS.length - 1) {
+      setCurrentProblem(currentProblem + 1);
+      setCurrentBalance(problem.correctAnswer);
+      setUserAnswer('');
+      setQuestionStartTime(Date.now());
+      setIsTimerRunning(false);
+      setTimeout(() => setIsTimerRunning(true), 100);
+    } else {
+      finishGame(newResponses);
+    }
+  };
+
+  const finishGame = async (finalResponses: any[]) => {
+    setIsTimerRunning(false);
+    
+    // Calculate metrics
+    const correct = finalResponses.filter(r => r.isCorrect).length;
+    const total = finalResponses.length;
+    const totalTime = (Date.now() - gameStartTime) / 1000;
+    
+    // Calculate percentage error (for graded mode)
+    const errors = finalResponses.map(r => {
+      const expected = r.correctAnswer;
+      const actual = r.userAnswer;
+      if (expected === 0) return actual === 0 ? 0 : 100;
+      return Math.abs((actual - expected) / expected) * 100;
+    });
+    const avgPercentError = errors.reduce((sum, e) => sum + e, 0) / errors.length;
+
+    // Calculate score using scoring engine
     const gameResult = calculateMentalMathScore(config.mentalMath, {
       correct,
-      total: TOTAL_QUESTIONS,
-      percentError,
+      total,
+      percentError: avgPercentError,
       timeTaken: totalTime,
-      maxTime: MAX_TIME,
-      numOperations: TOTAL_QUESTIONS,
+      maxTime: total * timePerQuestion,
+      numOperations: total,
     });
 
     setResult(gameResult);
+    setGameState('results');
 
     // Save to database
     try {
-      await saveGameResult('mental-math-easy', gameResult);
-      toast.success('Game result saved successfully!');
+      await supabase.from('game_results').insert({
+        game_id: 'mental-math',
+        score_data: gameResult,
+      });
     } catch (error) {
-      toast.error('Failed to save game result');
-      console.error(error);
+      console.error('Error saving result:', error);
     }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && userAnswer.trim()) {
-      submitAnswer();
+    if (e.key === 'Enter') {
+      handleSubmit();
     }
   };
 
-  if (gameState === 'finished' && result) {
+  if (gameState === 'instructions') {
     return (
       <div className="container mx-auto px-6 py-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-8">
-            <Button
-              onClick={() => setGameState('ready')}
-              variant="outline"
-            >
-              ← Back to Start
-            </Button>
-          </div>
-          <ScoreDisplay result={result} />
+        <div className="max-w-2xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-2xl">
+                <Calculator className="w-6 h-6 text-primary" />
+                Mental Math Sprint - Easy
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Instructions</h3>
+                <p className="text-muted-foreground mb-4">
+                  Race from 100 to 200! You'll start at 100 and solve 11 math problems.
+                  Keep track of the running balance as you add and subtract numbers.
+                </p>
+              </div>
+              <div className="bg-muted p-4 rounded-lg">
+                <h4 className="font-semibold mb-2">Game Details:</h4>
+                <ul className="space-y-1 text-sm">
+                  <li>• 11 problems - Race from 100 to 200!</li>
+                  <li>• {timePerQuestion} seconds per problem</li>
+                  <li>• Keep track of the running total</li>
+                  <li>• Tests speed, accuracy, and mental stamina</li>
+                </ul>
+              </div>
+              <Button onClick={startGame} className="w-full" size="lg">
+                <Play className="w-4 h-4 mr-2" />
+                Start Game
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
-  if (gameState === 'playing' && questions.length > 0) {
-    const currentQ = questions[currentQuestion];
-    
+  if (gameState === 'playing') {
+    const problem = PROBLEMS[currentProblem];
     return (
       <div className="container mx-auto px-6 py-8">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -152,46 +214,40 @@ const MentalMathEasy = () => {
                   <Calculator className="w-5 h-5 text-primary" />
                   Mental Math Sprint
                 </CardTitle>
-                <Timer isRunning={true} maxTime={MAX_TIME} />
+                <Timer
+                  isRunning={isTimerRunning}
+                  initialTime={timePerQuestion}
+                  countDown
+                  maxTime={timePerQuestion}
+                  onComplete={handleTimeout}
+                />
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <ProgressBar
-                current={currentQuestion + 1}
-                total={TOTAL_QUESTIONS}
-                label="Progress"
-              />
-
-              <div className="text-center py-12">
-                <div className="text-6xl font-bold text-primary mb-8">
-                  {currentQ.num1} {currentQ.operator} {currentQ.num2} = ?
+              <ProgressBar current={currentProblem + 1} total={PROBLEMS.length} />
+              
+              <div className="text-center space-y-6">
+                <div className="text-sm text-muted-foreground">
+                  Current Balance: {currentBalance}
+                </div>
+                
+                <div className="text-5xl font-bold">
+                  {currentBalance} {problem.operator} {problem.operand} = ?
                 </div>
 
-                <input
+                <Input
                   type="number"
                   value={userAnswer}
                   onChange={(e) => setUserAnswer(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Your answer"
-                  className="text-4xl text-center p-4 border-2 border-primary rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="text-center text-2xl"
                   autoFocus
                 />
-              </div>
 
-              <div className="flex justify-center">
-                <Button
-                  onClick={submitAnswer}
-                  size="lg"
-                  disabled={!userAnswer.trim()}
-                  className="w-48"
-                >
-                  <CheckCircle className="w-5 h-5 mr-2" />
+                <Button onClick={handleSubmit} className="w-full" size="lg" disabled={!userAnswer.trim()}>
                   Submit Answer
                 </Button>
-              </div>
-
-              <div className="text-center text-sm text-muted-foreground">
-                Press Enter to submit
               </div>
             </CardContent>
           </Card>
@@ -200,54 +256,17 @@ const MentalMathEasy = () => {
     );
   }
 
-  return (
-    <div className="container mx-auto px-6 py-8">
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-2xl">
-              <Calculator className="w-6 h-6 text-primary" />
-              Mental Math Sprint - Easy
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <p className="text-lg">
-                Test your mental arithmetic skills with {TOTAL_QUESTIONS} quick calculations.
-              </p>
-              
-              <div className="bg-muted p-4 rounded-lg space-y-2">
-                <h3 className="font-semibold">Game Rules:</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li>Answer {TOTAL_QUESTIONS} math questions as quickly as possible</li>
-                  <li>Questions include addition, subtraction, and multiplication</li>
-                  <li>You have {MAX_TIME / 60} minutes total</li>
-                  <li>Type your answer and press Enter or click Submit</li>
-                </ul>
-              </div>
-
-              <div className="bg-primary/10 p-4 rounded-lg space-y-2">
-                <h3 className="font-semibold text-primary">Competencies Tested:</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  <li><strong>Accuracy:</strong> How many answers you get correct</li>
-                  <li><strong>Speed:</strong> How quickly you complete the test</li>
-                  <li><strong>Quantitative Aptitude:</strong> Combined accuracy and speed</li>
-                  <li><strong>Mental Stamina:</strong> Sustained performance throughout</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="flex justify-center pt-4">
-              <Button onClick={startGame} size="lg" className="w-48">
-                <Play className="w-5 h-5 mr-2" />
-                Start Game
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+  if (gameState === 'results' && result) {
+    return (
+      <div className="container mx-auto px-6 py-8">
+        <div className="max-w-2xl mx-auto">
+          <ScoreDisplay result={result} />
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 };
 
 export default MentalMathEasy;
