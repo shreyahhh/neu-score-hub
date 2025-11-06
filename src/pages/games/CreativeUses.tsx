@@ -1,16 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { Lightbulb, Clock, Sparkles, Trophy } from 'lucide-react';
+import { Lightbulb, Sparkles, Trophy } from 'lucide-react';
+import { Timer } from '@/components/game/Timer';
 import { useToast } from '@/hooks/use-toast';
+import { CREATIVE_USES_QUESTIONS } from '@/data/creativeUsesQuestions';
 
-const QUESTIONS = [
-  { id: 1, object: 'Brick', question: 'How many possible uses can you think of for a brick?' },
-  { id: 2, object: 'Paperclip', question: 'How many possible uses can you think of for a paperclip?' },
-  { id: 3, object: 'Plastic Bottle', question: 'How many possible uses can you think of for a plastic bottle?' }
-];
+const QUESTIONS = CREATIVE_USES_QUESTIONS;
 
 const TIME_LIMIT = 60; // seconds per question
 const GEMINI_API_KEY = 'AIzaSyDQNjMZ6VfloVvjGq02AKq9TRN6CxAy0ZU';
@@ -48,24 +46,9 @@ const CreativeUses = () => {
   const [isScoring, setIsScoring] = useState(false);
   const { toast } = useToast();
 
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+
   const currentQuestion = QUESTIONS[currentQuestionIndex];
-
-  // Timer countdown
-  useEffect(() => {
-    if (phase !== 'playing') return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleSubmitAnswer();
-          return TIME_LIMIT;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [phase, currentQuestionIndex]);
 
   const handleStart = () => {
     setPhase('playing');
@@ -74,6 +57,7 @@ const CreativeUses = () => {
     setCurrentAnswer('');
     setResponses([]);
     setResults(null);
+    setIsTimerRunning(true);
   };
 
   const handleSubmitAnswer = async () => {
@@ -93,11 +77,18 @@ const CreativeUses = () => {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setCurrentAnswer('');
       setTimeLeft(TIME_LIMIT);
+      setIsTimerRunning(false);
+      setTimeout(() => setIsTimerRunning(true), 100);
     } else {
       // All questions completed, score with AI
+      setIsTimerRunning(false);
       setIsScoring(true);
       await scoreWithGemini(updatedResponses);
     }
+  };
+
+  const handleTimeout = () => {
+    handleSubmitAnswer();
   };
 
   const scoreWithGemini = async (allResponses: QuestionResponse[]) => {
@@ -152,7 +143,8 @@ Return ONLY a valid JSON array with this exact structure:
       
       const questionScores: QuestionScore[] = JSON.parse(jsonMatch[0]).map((qs: any) => ({
         ...qs,
-        score: Math.round((qs.usesCount * 5 + qs.innovationScore) / 2)
+        // Enhanced scoring: Creativity (70%) + Speed bonus (30%)
+        score: Math.round((qs.innovationScore * 0.7) + (qs.usesCount * 3))
       }));
 
       const overallScore = Math.round(
@@ -250,17 +242,20 @@ Return ONLY a valid JSON array with this exact structure:
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Question {currentQuestionIndex + 1} of {QUESTIONS.length}</CardTitle>
-                <div className={`flex items-center gap-2 ${getTimerColor()} font-bold text-xl`}>
-                  <Clock className="w-5 h-5" />
-                  {timeLeft}s
-                </div>
+                <Timer
+                  isRunning={isTimerRunning}
+                  initialTime={TIME_LIMIT}
+                  countDown
+                  maxTime={TIME_LIMIT}
+                  onComplete={handleTimeout}
+                />
               </div>
               <Progress value={(currentQuestionIndex / QUESTIONS.length) * 100} className="mt-2" />
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-primary/10 border-2 border-primary rounded-lg p-6 text-center">
                 <h2 className="text-2xl font-bold mb-2">{currentQuestion.object}</h2>
-                <p className="text-lg text-muted-foreground">{currentQuestion.question}</p>
+                <p className="text-lg text-muted-foreground">{currentQuestion.description}</p>
               </div>
 
               <div>
@@ -310,7 +305,7 @@ Return ONLY a valid JSON array with this exact structure:
             <CardContent className="space-y-6">
               <div className="text-center bg-gradient-to-br from-primary/20 to-accent/20 rounded-lg p-8">
                 <p className="text-sm text-muted-foreground mb-2">Overall Score</p>
-                <p className="text-6xl font-bold mb-2">{results.overallScore}</p>
+                <p className="text-6xl font-bold mb-2">{results.overallScore}/100</p>
                 <p className={`text-xl font-semibold ${badge.color}`}>{badge.text}</p>
               </div>
 
