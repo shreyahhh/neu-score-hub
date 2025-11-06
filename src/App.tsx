@@ -17,6 +17,8 @@ import CardFlipEasy from "./pages/games/CardFlipEasy";
 import ScenarioChallenge from "./pages/games/ScenarioChallenge";
 import DebateMode from "./pages/games/DebateMode";
 import CreativeUses from "./pages/games/CreativeUses";
+import Interview from "./pages/games/Interview";
+import PatternSudoku from "./pages/games/PatternSudoku";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,8 @@ const App = () => (
                 <Route path="/games/scenario-challenge" element={<ScenarioChallenge />} />
                 <Route path="/games/debate-mode" element={<DebateMode />} />
                 <Route path="/games/creative-uses" element={<CreativeUses />} />
+                <Route path="/games/interview" element={<Interview />} />
+                <Route path="/games/pattern-sudoku" element={<PatternSudoku />} />
                 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
