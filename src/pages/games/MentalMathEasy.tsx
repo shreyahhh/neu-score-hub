@@ -10,19 +10,18 @@ import { useScoringConfig } from '@/context/ScoringConfigContext';
 import { calculateMentalMathScore } from '@/lib/scoring';
 import { supabase } from '@/lib/supabase';
 
-// Fixed problem sequence: Race from 100 to 200
+// Problem sequence
 const PROBLEMS = [
-  { id: 1, operand: 7, operator: '+' as const, correctAnswer: 107 },
-  { id: 2, operand: 9, operator: '+' as const, correctAnswer: 116 },
-  { id: 3, operand: 13, operator: '-' as const, correctAnswer: 103 },
-  { id: 4, operand: 8, operator: '+' as const, correctAnswer: 111 },
-  { id: 5, operand: 11, operator: '+' as const, correctAnswer: 122 },
-  { id: 6, operand: 12, operator: '-' as const, correctAnswer: 110 },
-  { id: 7, operand: 20, operator: '+' as const, correctAnswer: 130 },
-  { id: 8, operand: 15, operator: '+' as const, correctAnswer: 145 },
-  { id: 9, operand: 17, operator: '+' as const, correctAnswer: 162 },
-  { id: 10, operand: 18, operator: '+' as const, correctAnswer: 180 },
-  { id: 11, operand: 20, operator: '+' as const, correctAnswer: 200 },
+  { id: 1, startValue: 103, operand: 9, operator: '-' as const, correctAnswer: 94 },
+  { id: 2, startValue: 105, operand: 11, operator: '+' as const, correctAnswer: 116 },
+  { id: 3, startValue: 109, operand: 6, operator: '-' as const, correctAnswer: 103 },
+  { id: 4, startValue: 101, operand: 14, operator: '+' as const, correctAnswer: 115 },
+  { id: 5, startValue: 104, operand: 13, operator: '-' as const, correctAnswer: 91 },
+  { id: 6, startValue: 109, operand: 7, operator: '+' as const, correctAnswer: 116 },
+  { id: 7, startValue: 108, operand: 15, operator: '-' as const, correctAnswer: 93 },
+  { id: 8, startValue: 103, operand: 19, operator: '+' as const, correctAnswer: 122 },
+  { id: 9, startValue: 107, operand: 10, operator: '-' as const, correctAnswer: 97 },
+  { id: 10, startValue: 102, operand: 13, operator: '+' as const, correctAnswer: 115 },
 ];
 
 type GameState = 'instructions' | 'playing' | 'results';
@@ -44,7 +43,7 @@ const MentalMathEasy = () => {
   const startGame = () => {
     setGameState('playing');
     setCurrentProblem(0);
-    setCurrentBalance(100);
+    setCurrentBalance(PROBLEMS[0].startValue);
     setResponses([]);
     setUserAnswer('');
     setGameStartTime(Date.now());
@@ -76,8 +75,9 @@ const MentalMathEasy = () => {
     setResponses(newResponses);
 
     if (currentProblem < PROBLEMS.length - 1) {
+      const nextProblem = PROBLEMS[currentProblem + 1];
       setCurrentProblem(currentProblem + 1);
-      setCurrentBalance(problem.correctAnswer);
+      setCurrentBalance(nextProblem.startValue);
       setUserAnswer('');
       setQuestionStartTime(Date.now());
       setIsTimerRunning(false);
@@ -105,8 +105,9 @@ const MentalMathEasy = () => {
     setResponses(newResponses);
 
     if (currentProblem < PROBLEMS.length - 1) {
+      const nextProblem = PROBLEMS[currentProblem + 1];
       setCurrentProblem(currentProblem + 1);
-      setCurrentBalance(problem.correctAnswer);
+      setCurrentBalance(nextProblem.startValue);
       setUserAnswer('');
       setQuestionStartTime(Date.now());
       setIsTimerRunning(false);
@@ -134,7 +135,10 @@ const MentalMathEasy = () => {
     const avgPercentError = errors.reduce((sum, e) => sum + e, 0) / errors.length;
 
     // Calculate score using scoring engine
-    const gameResult = calculateMentalMathScore(config.mental_math_sprint || config.mentalMath, {
+    const gameConfig = config.mental_math_sprint || {
+      final_weights: { accuracy: 0.4, speed: 0.3, quantitative_aptitude: 0.2, mental_stamina: 0.1 }
+    };
+    const gameResult = calculateMentalMathScore(gameConfig, {
       correct,
       total,
       percentError: avgPercentError,
@@ -176,16 +180,16 @@ const MentalMathEasy = () => {
               <div>
                 <h3 className="text-lg font-semibold mb-2">Instructions</h3>
                 <p className="text-muted-foreground mb-4">
-                  Race from 100 to 200! You'll start at 100 and solve 11 math problems.
-                  Keep track of the running balance as you add and subtract numbers.
+                  Solve {PROBLEMS.length} mental math problems as quickly and accurately as possible.
+                  Each problem starts with a new number and you need to perform the operation.
                 </p>
               </div>
               <div className="bg-muted p-4 rounded-lg">
                 <h4 className="font-semibold mb-2">Game Details:</h4>
                 <ul className="space-y-1 text-sm">
-                  <li>• 11 problems - Race from 100 to 200!</li>
+                  <li>• {PROBLEMS.length} math problems</li>
                   <li>• {timePerQuestion} seconds per problem</li>
-                  <li>• Keep track of the running total</li>
+                  <li>• Each question starts with a new number</li>
                   <li>• Tests speed, accuracy, and mental stamina</li>
                 </ul>
               </div>

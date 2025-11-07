@@ -43,7 +43,9 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
       setEditedConfig(version.config);
     } catch (error) {
       console.error('Error loading config:', error);
-      toast.error('Failed to load configuration');
+      toast.error('Failed to load configuration from database. Using default values.');
+      // Set default config as fallback
+      setEditedConfig(config[gameType] || { final_weights: {}, competency_formulas: {}, settings: {} });
     } finally {
       setLoading(false);
     }

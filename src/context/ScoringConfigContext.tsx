@@ -18,6 +18,83 @@ export function ScoringConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<any>({});
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const getDefaultConfig = (gameType: GameType) => {
+    const defaults: Record<GameType, any> = {
+      mental_math_sprint: {
+        final_weights: { accuracy: 0.4, speed: 0.3, quantitative_aptitude: 0.2, mental_stamina: 0.1 },
+        competency_formulas: {},
+        settings: { accuracy_mode: 'binary', time_limit: 5 },
+        variables: []
+      },
+      stroop_test: {
+        final_weights: { cognitive_flexibility: 0.4, cognitive_agility: 0.3, accuracy: 0.2, speed: 0.1 },
+        competency_formulas: {},
+        settings: {},
+        variables: []
+      },
+      sign_sudoku: {
+        final_weights: { accuracy: 0.3, reasoning: 0.3, attention_to_detail: 0.2, speed: 0.1, math: 0.1 },
+        competency_formulas: {},
+        settings: {},
+        variables: []
+      },
+      face_name_match: {
+        final_weights: { memory: 0.4, accuracy: 0.3, speed: 0.3 },
+        competency_formulas: {},
+        settings: {},
+        variables: []
+      },
+      card_flip_challenge: {
+        final_weights: { pattern_recognition: 0.4, reasoning: 0.3, strategy: 0.2, speed: 0.1 },
+        competency_formulas: {},
+        settings: {},
+        variables: []
+      },
+      scenario_challenge: {
+        final_weights: { reasoning: 0.3, decision_making: 0.3, empathy: 0.2, creativity: 0.1, communication: 0.1 },
+        competency_formulas: {},
+        ai_prompts: {},
+        settings: {},
+        variables: []
+      },
+      ai_debate: {
+        final_weights: { reasoning: 0.4, holistic_analysis: 0.3, cognitive_agility: 0.2, communication: 0.1 },
+        competency_formulas: {},
+        ai_prompts: {},
+        settings: {},
+        variables: []
+      },
+      creative_uses: {
+        final_weights: { creativity: 0.7, speed: 0.3 },
+        competency_formulas: {},
+        ai_prompts: {},
+        settings: {},
+        variables: []
+      },
+      statement_reasoning: {
+        final_weights: { reasoning: 0.5, communication: 0.3, creativity: 0.2 },
+        competency_formulas: {},
+        ai_prompts: {},
+        settings: {},
+        variables: []
+      },
+      vocab_challenge: {
+        final_weights: { vocabulary: 0.6, speed: 0.4 },
+        competency_formulas: {},
+        settings: {},
+        variables: []
+      },
+      lucky_flip: {
+        final_weights: { risk_appetite: 0.4, drive: 0.3, reasoning: 0.3 },
+        competency_formulas: {},
+        ai_prompts: {},
+        settings: {},
+        variables: []
+      }
+    };
+    return defaults[gameType] || { final_weights: {}, competency_formulas: {}, settings: {}, variables: [] };
+  };
+
   // Load all active configs on mount
   useEffect(() => {
     loadAllConfigs();
@@ -43,6 +120,7 @@ export function ScoringConfigProvider({ children }: { children: ReactNode }) {
           configs[gameType] = version.config;
         } catch (error) {
           console.warn(`No active version for ${gameType}, using defaults`);
+          configs[gameType] = getDefaultConfig(gameType);
         }
       }
       
@@ -64,7 +142,12 @@ export function ScoringConfigProvider({ children }: { children: ReactNode }) {
       return version.config;
     } catch (error) {
       console.error(`Failed to load config for ${gameType}:`, error);
-      throw error;
+      const defaultConfig = getDefaultConfig(gameType);
+      setConfig((prev: any) => ({
+        ...prev,
+        [gameType]: defaultConfig,
+      }));
+      return defaultConfig;
     }
   };
 
