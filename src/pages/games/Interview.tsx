@@ -138,6 +138,21 @@ Return ONLY valid JSON: {"score": X, "feedback": "..."}`
     setResponses(scoredResponses);
     setOverallScore(avgScore);
     setIsScoring(false);
+
+    // Save to database
+    try {
+      const { submitGameResult } = await import('@/lib/supabase');
+      await submitGameResult('scenario_challenge', scoredResponses, {
+        gameId: 'interview',
+        gameName: 'Interview Assessment',
+        timestamp: new Date(),
+        finalScore: avgScore * 10,
+        competencies: [],
+        rawData: { responses: scoredResponses }
+      });
+    } catch (error) {
+      console.error('Error saving result:', error);
+    }
   };
 
   if (gameState === 'welcome') {

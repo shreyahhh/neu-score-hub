@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useScoringConfig } from '@/context/ScoringConfigContext';
-import { ScoringConfig } from '@/lib/types';
+import { GameType, getActiveScoringVersion } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 interface ScoringControlsModalProps {
@@ -24,52 +24,185 @@ interface ScoringControlsModalProps {
 }
 
 export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModalProps) {
-  const { config, updateConfig, resetConfig } = useScoringConfig();
-  const [editedConfig, setEditedConfig] = useState<ScoringConfig>(config);
+  const { config, updateConfig, loadGameConfig } = useScoringConfig();
+  const [editedConfig, setEditedConfig] = useState<any>({});
+  const [activeTab, setActiveTab] = useState<GameType>('mental_math_sprint');
+  const [loading, setLoading] = useState(false);
 
-  // Update local state when modal opens
+  // Load config when tab changes
   React.useEffect(() => {
-    if (open) {
-      setEditedConfig(config);
+    if (open && activeTab) {
+      loadConfig(activeTab);
     }
-  }, [open, config]);
+  }, [open, activeTab]);
 
-  const handleSave = () => {
-    updateConfig(editedConfig);
-    toast.success('Scoring configuration saved successfully');
-    onOpenChange(false);
+  const loadConfig = async (gameType: GameType) => {
+    try {
+      setLoading(true);
+      const version = await getActiveScoringVersion(gameType);
+      setEditedConfig(version.config);
+    } catch (error) {
+      console.error('Error loading config:', error);
+      toast.error('Failed to load configuration');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReset = () => {
-    resetConfig();
-    setEditedConfig(config);
-    toast.success('Scoring configuration reset to defaults');
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      await updateConfig(activeTab, editedConfig, 'Updated via UI');
+      toast.success(`Configuration saved as new version for ${activeTab}`);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error saving:', error);
+      toast.error('Failed to save configuration');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateWeight = (game: keyof ScoringConfig, competency: string, value: number) => {
-    setEditedConfig({
-      ...editedConfig,
-      [game]: {
-        ...editedConfig[game],
-        weights: {
-          ...(editedConfig[game] as any).weights,
-          [competency]: value,
-        },
+  const updateFinalWeight = (competency: string, value: number) => {
+    setEditedConfig((prev: any) => ({
+      ...prev,
+      final_weights: {
+        ...prev.final_weights,
+        [competency]: value,
       },
-    });
+    }));
   };
 
-  const updateNestedValue = (game: keyof ScoringConfig, section: string, field: string, value: any) => {
-    setEditedConfig({
-      ...editedConfig,
-      [game]: {
-        ...editedConfig[game],
-        [section]: {
-          ...(editedConfig[game] as any)[section],
-          [field]: value,
-        },
+  const updateFormula = (competency: string, value: string) => {
+    setEditedConfig((prev: any) => ({
+      ...prev,
+      competency_formulas: {
+        ...prev.competency_formulas,
+        [competency]: value,
       },
-    });
+    }));
+  };
+
+  const updateAIPrompt = (key: string, value: string) => {
+    setEditedConfig((prev: any) => ({
+      ...prev,
+      ai_prompts: {
+        ...prev.ai_prompts,
+        [key]: value,
+      },
+    }));
+  };
+
+  const renderGameConfig = () => {
+    if (loading || !editedConfig) {
+      return <div className="py-8 text-center text-muted-foreground">Loading...</div>;
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Final Weights */}
+        {editedConfig.final_weights && (
+          <div className="space-y-2">
+            <h3 className="font-semibold">Final Weights</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(editedConfig.final_weights).map(([key, value]) => (
+                <div key={key}>
+                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={value as number}
+                    onChange={(e) => updateFinalWeight(key, parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Competency Formulas */}
+        {editedConfig.competency_formulas && (
+          <div className="space-y-2">
+            <h3 className="font-semibold">Competency Formulas</h3>
+            <p className="text-xs text-muted-foreground">
+              Edit the mathematical formulas used to calculate each competency score
+            </p>
+            <div className="space-y-3">
+              {Object.entries(editedConfig.competency_formulas).map(([key, value]) => (
+                <div key={key}>
+                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Textarea
+                    value={value as string}
+                    onChange={(e) => updateFormula(key, e.target.value)}
+                    rows={2}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI Prompts */}
+        {editedConfig.ai_prompts && (
+          <div className="space-y-2">
+            <h3 className="font-semibold">AI Prompts</h3>
+            <p className="text-xs text-muted-foreground">
+              Configure the prompts used for AI-based scoring
+            </p>
+            <div className="space-y-3">
+              {Object.entries(editedConfig.ai_prompts).map(([key, value]) => (
+                <div key={key}>
+                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Textarea
+                    value={value as string}
+                    onChange={(e) => updateAIPrompt(key, e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Settings */}
+        {editedConfig.settings && (
+          <div className="space-y-2">
+            <h3 className="font-semibold">Settings</h3>
+            <div className="space-y-2">
+              {Object.entries(editedConfig.settings).map(([key, value]) => (
+                <div key={key} className="grid grid-cols-2 gap-2 items-center">
+                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Input
+                    type={typeof value === 'number' ? 'number' : 'text'}
+                    value={value as any}
+                    onChange={(e) => setEditedConfig((prev: any) => ({
+                      ...prev,
+                      settings: {
+                        ...prev.settings,
+                        [key]: typeof value === 'number' ? parseFloat(e.target.value) : e.target.value,
+                      },
+                    }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Variables Reference */}
+        {editedConfig.variables && (
+          <div className="space-y-2">
+            <h3 className="font-semibold">Available Variables</h3>
+            <div className="bg-muted p-3 rounded-md">
+              <p className="text-xs font-mono">
+                {editedConfig.variables.join(', ')}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -78,248 +211,35 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
         <DialogHeader>
           <DialogTitle>Scoring Controls</DialogTitle>
           <DialogDescription>
-            Modify scoring formulas, weights, and AI prompts for all games. Changes persist in localStorage.
+            Modify scoring formulas, weights, and AI prompts. Changes will create a new version.
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="mentalMath" className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as GameType)} className="w-full">
           <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto">
-            <TabsTrigger value="mentalMath">Mental Math</TabsTrigger>
-            <TabsTrigger value="stroopTest">Stroop Test</TabsTrigger>
-            <TabsTrigger value="signSudoku">Sign Sudoku</TabsTrigger>
-            <TabsTrigger value="faceNameMatch">Face-Name</TabsTrigger>
-            <TabsTrigger value="cardFlip">Card Flip</TabsTrigger>
-            <TabsTrigger value="scenarioChallenge">Scenario</TabsTrigger>
-            <TabsTrigger value="debateMode">Debate</TabsTrigger>
-            <TabsTrigger value="creativeUses">Creative Uses</TabsTrigger>
+            <TabsTrigger value="mental_math_sprint">Mental Math</TabsTrigger>
+            <TabsTrigger value="stroop_test">Stroop Test</TabsTrigger>
+            <TabsTrigger value="sign_sudoku">Sign Sudoku</TabsTrigger>
+            <TabsTrigger value="face_name_match">Face-Name</TabsTrigger>
+            <TabsTrigger value="card_flip_challenge">Card Flip</TabsTrigger>
+            <TabsTrigger value="scenario_challenge">Scenario</TabsTrigger>
+            <TabsTrigger value="ai_debate">Debate</TabsTrigger>
+            <TabsTrigger value="creative_uses">Creative Uses</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[50vh] mt-4">
-            {/* Mental Math */}
-            <TabsContent value="mentalMath" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.mentalMath.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('mentalMath', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-semibold">Accuracy Mode</h3>
-                <select
-                  className="w-full p-2 border rounded"
-                  value={editedConfig.mentalMath.accuracy.mode}
-                  onChange={(e) => updateNestedValue('mentalMath', 'accuracy', 'mode', e.target.value)}
-                >
-                  <option value="binary">Binary (100 or 0)</option>
-                  <option value="graded">Graded (100 - % Error)</option>
-                </select>
-              </div>
-            </TabsContent>
-
-            {/* Stroop Test */}
-            <TabsContent value="stroopTest" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.stroopTest.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('stroopTest', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Sign Sudoku */}
-            <TabsContent value="signSudoku" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.signSudoku.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('signSudoku', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Face-Name Match */}
-            <TabsContent value="faceNameMatch" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.faceNameMatch.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('faceNameMatch', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Card Flip */}
-            <TabsContent value="cardFlip" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.cardFlip.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('cardFlip', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* Scenario Challenge */}
-            <TabsContent value="scenarioChallenge" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.scenarioChallenge.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('scenarioChallenge', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-semibold">AI Prompt</h3>
-                <Textarea
-                  rows={6}
-                  value={editedConfig.scenarioChallenge.aiPrompt}
-                  onChange={(e) => setEditedConfig({
-                    ...editedConfig,
-                    scenarioChallenge: {
-                      ...editedConfig.scenarioChallenge,
-                      aiPrompt: e.target.value,
-                    },
-                  })}
-                />
-              </div>
-            </TabsContent>
-
-            {/* Debate Mode */}
-            <TabsContent value="debateMode" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.debateMode.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('debateMode', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-semibold">AI Prompt</h3>
-                <Textarea
-                  rows={6}
-                  value={editedConfig.debateMode.aiPrompt}
-                  onChange={(e) => setEditedConfig({
-                    ...editedConfig,
-                    debateMode: {
-                      ...editedConfig.debateMode,
-                      aiPrompt: e.target.value,
-                    },
-                  })}
-                />
-              </div>
-            </TabsContent>
-
-            {/* Creative Uses */}
-            <TabsContent value="creativeUses" className="space-y-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Final Weights</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(editedConfig.creativeUses.weights).map(([key, value]) => (
-                    <div key={key}>
-                      <Label className="text-xs capitalize">{key.replace(/([A-Z])/g, ' $1')}</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={value}
-                        onChange={(e) => updateWeight('creativeUses', key, parseFloat(e.target.value))}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-semibold">AI Prompt</h3>
-                <Textarea
-                  rows={6}
-                  value={editedConfig.creativeUses.aiPrompt}
-                  onChange={(e) => setEditedConfig({
-                    ...editedConfig,
-                    creativeUses: {
-                      ...editedConfig.creativeUses,
-                      aiPrompt: e.target.value,
-                    },
-                  })}
-                />
-              </div>
+            <TabsContent value={activeTab}>
+              {renderGameConfig()}
             </TabsContent>
           </ScrollArea>
         </Tabs>
 
         <div className="flex gap-3 justify-end pt-4 border-t">
-          <Button variant="outline" onClick={handleReset}>
-            Reset to Defaults
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
           </Button>
-          <Button onClick={handleSave}>
-            Save Configuration
+          <Button onClick={handleSave} disabled={loading}>
+            {loading ? 'Saving...' : 'Save New Version'}
           </Button>
         </div>
       </DialogContent>

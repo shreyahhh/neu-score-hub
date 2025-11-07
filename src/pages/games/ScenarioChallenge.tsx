@@ -69,8 +69,9 @@ const ScenarioChallenge = () => {
   };
 
   const finishGame = async (finalResponses: any[]) => {
-    // In a real implementation, this would call AI API for scoring
-    // For now, using mock scores
+    setIsTimerRunning(false);
+    
+    // Mock AI scores for now
     const mockAiScores = {
       reasoning: 75,
       decisionMaking: 80,
@@ -79,20 +80,32 @@ const ScenarioChallenge = () => {
       communication: 78,
     };
 
-    const gameResult = calculateScenarioChallengeScore(config.scenarioChallenge, mockAiScores);
+    const competencies = [
+      { name: 'Reasoning', score: mockAiScores.reasoning, weight: 0.3, weightedScore: mockAiScores.reasoning * 0.3 },
+      { name: 'Decision Making', score: mockAiScores.decisionMaking, weight: 0.3, weightedScore: mockAiScores.decisionMaking * 0.3 },
+      { name: 'Empathy', score: mockAiScores.empathy, weight: 0.2, weightedScore: mockAiScores.empathy * 0.2 },
+      { name: 'Creativity', score: mockAiScores.creativity, weight: 0.1, weightedScore: mockAiScores.creativity * 0.1 },
+      { name: 'Communication', score: mockAiScores.communication, weight: 0.1, weightedScore: mockAiScores.communication * 0.1 },
+    ];
+
+    const finalScore = competencies.reduce((sum, c) => sum + c.weightedScore, 0);
+
+    const gameResult = {
+      gameId: 'scenario-challenge',
+      gameName: 'Scenario Challenge',
+      timestamp: new Date(),
+      finalScore,
+      competencies,
+      rawData: { responses: finalResponses, aiScores: mockAiScores }
+    };
     
     setResult(gameResult);
     setGameState('results');
 
     // Save to database
     try {
-      await supabase.from('game_results').insert({
-        game_id: 'scenario-challenge',
-        score_data: {
-          ...gameResult,
-          responses: finalResponses,
-        },
-      });
+      const { submitGameResult } = await import('@/lib/supabase');
+      await submitGameResult('scenario_challenge', finalResponses, gameResult);
     } catch (error) {
       console.error('Error saving result:', error);
     }

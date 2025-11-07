@@ -3,62 +3,87 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ScoringConfig } from '@/lib/types';
 import { DEFAULT_CONFIG } from '@/lib/config';
+import { getActiveScoringVersion, GameType, saveNewScoringVersion } from '@/lib/supabase';
 
 interface ScoringConfigContextType {
-  config: ScoringConfig;
-  updateConfig: (newConfig: ScoringConfig) => void;
-  resetConfig: () => void;
+  config: any; // Config from active versions
+  updateConfig: (gameType: GameType, newConfig: any, description?: string) => Promise<void>;
+  loadGameConfig: (gameType: GameType) => Promise<any>;
   isLoaded: boolean;
 }
 
 const ScoringConfigContext = createContext<ScoringConfigContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'neurazor-scoring-config';
-
 export function ScoringConfigProvider({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<ScoringConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<any>({});
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load config from localStorage on mount
+  // Load all active configs on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setConfig(parsed);
-        console.log('Loaded scoring config from localStorage');
-      }
-    } catch (error) {
-      console.error('Failed to load scoring config from localStorage:', error);
-    } finally {
-      setIsLoaded(true);
-    }
+    loadAllConfigs();
   }, []);
 
-  // Save config to localStorage whenever it changes
-  const updateConfig = (newConfig: ScoringConfig) => {
+  const loadAllConfigs = async () => {
     try {
-      setConfig(newConfig);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
-      console.log('Saved scoring config to localStorage');
+      const gameTypes: GameType[] = [
+        'mental_math_sprint',
+        'face_name_match',
+        'sign_sudoku',
+        'stroop_test',
+        'card_flip_challenge',
+        'scenario_challenge',
+        'ai_debate',
+        'creative_uses',
+      ];
+
+      const configs: any = {};
+      for (const gameType of gameTypes) {
+        try {
+          const version = await getActiveScoringVersion(gameType);
+          configs[gameType] = version.config;
+        } catch (error) {
+          console.warn(`No active version for ${gameType}, using defaults`);
+        }
+      }
+      
+      setConfig(configs);
+      setIsLoaded(true);
     } catch (error) {
-      console.error('Failed to save scoring config to localStorage:', error);
+      console.error('Failed to load configs from Supabase:', error);
+      setIsLoaded(true);
     }
   };
 
-  // Reset to default configuration
-  const resetConfig = () => {
+  const loadGameConfig = async (gameType: GameType) => {
     try {
-      setConfig(DEFAULT_CONFIG);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_CONFIG));
-      console.log('Reset scoring config to default');
+      const version = await getActiveScoringVersion(gameType);
+      setConfig((prev: any) => ({
+        ...prev,
+        [gameType]: version.config,
+      }));
+      return version.config;
     } catch (error) {
-      console.error('Failed to reset scoring config:', error);
+      console.error(`Failed to load config for ${gameType}:`, error);
+      throw error;
+    }
+  };
+
+  const updateConfig = async (gameType: GameType, newConfig: any, description?: string) => {
+    try {
+      await saveNewScoringVersion(gameType, newConfig, description);
+      setConfig((prev: any) => ({
+        ...prev,
+        [gameType]: newConfig,
+      }));
+      console.log(`Saved new version for ${gameType}`);
+    } catch (error) {
+      console.error(`Failed to save config for ${gameType}:`, error);
+      throw error;
     }
   };
 
   return (
-    <ScoringConfigContext.Provider value={{ config, updateConfig, resetConfig, isLoaded }}>
+    <ScoringConfigContext.Provider value={{ config, updateConfig, loadGameConfig, isLoaded }}>
       {children}
     </ScoringConfigContext.Provider>
   );

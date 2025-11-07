@@ -134,7 +134,7 @@ const MentalMathEasy = () => {
     const avgPercentError = errors.reduce((sum, e) => sum + e, 0) / errors.length;
 
     // Calculate score using scoring engine
-    const gameResult = calculateMentalMathScore(config.mentalMath, {
+    const gameResult = calculateMentalMathScore(config.mental_math_sprint || config.mentalMath, {
       correct,
       total,
       percentError: avgPercentError,
@@ -146,12 +146,10 @@ const MentalMathEasy = () => {
     setResult(gameResult);
     setGameState('results');
 
-    // Save to database
+    // Save to database using new backend
     try {
-      await supabase.from('game_results').insert({
-        game_id: 'mental-math',
-        score_data: gameResult,
-      });
+      const { submitGameResult } = await import('@/lib/supabase');
+      await submitGameResult('mental_math_sprint', finalResponses, gameResult);
     } catch (error) {
       console.error('Error saving result:', error);
     }

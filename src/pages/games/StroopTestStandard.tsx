@@ -148,10 +148,8 @@ const StroopTestStandard = () => {
 
     // Save to database
     try {
-      await supabase.from('game_results').insert({
-        game_id: 'stroop-test',
-        score_data: gameResult,
-      });
+      const { submitGameResult } = await import('@/lib/supabase');
+      await submitGameResult('stroop_test', finalResponses, gameResult);
     } catch (error) {
       console.error('Error saving result:', error);
     }

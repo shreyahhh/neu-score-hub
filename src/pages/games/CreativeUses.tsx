@@ -165,6 +165,26 @@ Return ONLY a valid JSON array with this exact structure:
 
       setPhase('results');
       setIsScoring(false);
+
+      // Save to database
+      try {
+        const { submitGameResult } = await import('@/lib/supabase');
+        await submitGameResult('creative_uses', allResponses, {
+          gameId: 'creative-uses',
+          gameName: 'Creative Uses Challenge',
+          timestamp: new Date(),
+          finalScore: overallScore,
+          competencies: questionScores.map(qs => ({
+            name: qs.object,
+            score: qs.score,
+            weight: 1 / questionScores.length,
+            weightedScore: qs.score / questionScores.length
+          })),
+          rawData: { responses: allResponses, questionScores }
+        });
+      } catch (error) {
+        console.error('Error saving result:', error);
+      }
     } catch (error) {
       console.error('Scoring error:', error);
       toast({
