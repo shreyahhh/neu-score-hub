@@ -14,8 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useScoringConfig } from '@/context/ScoringConfigContext';
-import { GameType, getActiveScoringVersion } from '@/lib/supabase';
+import { useScoringConfig, GameType } from '@/context/ScoringConfigContext';
 import { toast } from 'sonner';
 
 interface ScoringControlsModalProps {
@@ -39,8 +38,8 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
   const loadConfig = async (gameType: GameType) => {
     try {
       setLoading(true);
-      const version = await getActiveScoringVersion(gameType);
-      setEditedConfig(version.config);
+      const versionConfig = await loadGameConfig(gameType);
+      setEditedConfig(versionConfig);
     } catch (error) {
       console.error('Error loading config:', error);
       toast.error('Failed to load configuration from database. Using default values.');

@@ -7,11 +7,10 @@ import { Lightbulb, Sparkles, Trophy } from 'lucide-react';
 import { Timer } from '@/components/game/Timer';
 import { useToast } from '@/hooks/use-toast';
 import { CREATIVE_USES_QUESTIONS } from '@/data/creativeUsesQuestions';
+import { submitAIGame } from '@/lib/api';
 
 const QUESTIONS = CREATIVE_USES_QUESTIONS;
-
 const TIME_LIMIT = 60; // seconds per question
-const GEMINI_API_KEY = 'AIzaSyDQNjMZ6VfloVvjGq02AKq9TRN6CxAy0ZU';
 
 type GamePhase = 'welcome' | 'playing' | 'results';
 
@@ -93,68 +92,13 @@ const CreativeUses = () => {
 
   const scoreWithGemini = async (allResponses: QuestionResponse[]) => {
     try {
-      const prompt = `You are evaluating creative thinking responses. For each object below, the user provided creative uses. Score each response based on:
-1. Number of valid, unique uses (count them)
-2. Innovation score (0-100) based on creativity, originality, category diversity, and detail
-
-Objects and responses:
-${allResponses.map(r => `\nObject: ${r.object}\nUses listed: ${r.answer}`).join('\n')}
-
-Return ONLY a valid JSON array with this exact structure:
-[
-  {
-    "object": "Brick",
-    "usesCount": 5,
-    "innovationScore": 75
-  },
-  {
-    "object": "Paperclip",
-    "usesCount": 7,
-    "innovationScore": 82
-  },
-  {
-    "object": "Plastic Bottle",
-    "usesCount": 6,
-    "innovationScore": 68
-  }
-]`;
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 1000
-            }
-          })
-        }
-      );
-
-      const data = await response.json();
-      const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      // Submit to backend for AI scoring
+      const result = await submitAIGame('creative_uses', allResponses);
       
-      // Extract JSON from response
-      const jsonMatch = aiText.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) throw new Error('Invalid AI response format');
-      
-      const questionScores: QuestionScore[] = JSON.parse(jsonMatch[0]).map((qs: any) => ({
-        ...qs,
-        // Enhanced scoring: Creativity (70%) + Speed bonus (30%)
-        score: Math.round((qs.innovationScore * 0.7) + (qs.usesCount * 3))
-      }));
-
-      const overallScore = Math.round(
-        questionScores.reduce((sum, qs) => sum + qs.score, 0) / questionScores.length
-      );
-
-      const totalUses = questionScores.reduce((sum, qs) => sum + qs.usesCount, 0);
-      const avgInnovation = Math.round(
-        questionScores.reduce((sum, qs) => sum + qs.innovationScore, 0) / questionScores.length
-      );
+      const questionScores: QuestionScore[] = result.questionScores || [];
+      const overallScore = result.overallScore || 0;
+      const totalUses = result.totalUses || 0;
+      const avgInnovation = result.avgInnovation || 0;
 
       setResults({
         questionScores,
@@ -165,26 +109,6 @@ Return ONLY a valid JSON array with this exact structure:
 
       setPhase('results');
       setIsScoring(false);
-
-      // Save to database
-      try {
-        const { submitGameResult } = await import('@/lib/supabase');
-        await submitGameResult('creative_uses', allResponses, {
-          gameId: 'creative-uses',
-          gameName: 'Creative Uses Challenge',
-          timestamp: new Date(),
-          finalScore: overallScore,
-          competencies: questionScores.map(qs => ({
-            name: qs.object,
-            score: qs.score,
-            weight: 1 / questionScores.length,
-            weightedScore: qs.score / questionScores.length
-          })),
-          rawData: { responses: allResponses, questionScores }
-        });
-      } catch (error) {
-        console.error('Error saving result:', error);
-      }
     } catch (error) {
       console.error('Scoring error:', error);
       toast({

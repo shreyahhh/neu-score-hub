@@ -7,7 +7,7 @@ import { ProgressBar } from '@/components/game/ProgressBar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { useScoringConfig } from '@/context/ScoringConfigContext';
 import { calculateStroopScore } from '@/lib/scoring';
-import { supabase } from '@/lib/supabase';
+import { submitGame } from '@/lib/api';
 
 // Question pool (30 questions)
 const QUESTION_POOL = [
@@ -148,8 +148,7 @@ const StroopTestStandard = () => {
 
     // Save to database
     try {
-      const { submitGameResult } = await import('@/lib/supabase');
-      await submitGameResult('stroop_test', finalResponses, gameResult);
+      await submitGame('stroop_test', finalResponses);
     } catch (error) {
       console.error('Error saving result:', error);
     }

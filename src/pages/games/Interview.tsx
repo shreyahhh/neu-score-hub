@@ -7,6 +7,7 @@ import { ProgressBar } from '@/components/game/ProgressBar';
 import { Timer } from '@/components/game/Timer';
 import { useNavigate } from 'react-router-dom';
 import { INTERVIEW_QUESTIONS } from '@/data/interviewQuestions';
+import { submitAIGame } from '@/lib/api';
 
 const QUESTIONS = INTERVIEW_QUESTIONS.map(q => ({
   id: q.id,
@@ -14,7 +15,6 @@ const QUESTIONS = INTERVIEW_QUESTIONS.map(q => ({
   competency: q.competency
 }));
 
-const GEMINI_API_KEY = 'AIzaSyDQNjMZ6VfloVvjGq02AKq9TRN6CxAy0ZU';
 const TIME_PER_QUESTION = 120; // 2 minutes
 
 type GameState = 'welcome' | 'playing' | 'results';
@@ -80,78 +80,23 @@ const Interview = () => {
     setGameState('results');
     setIsScoring(true);
 
-    const scoredResponses = await Promise.all(
-      allResponses.map(async (response, index) => {
-        try {
-          const result = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{
-                    text: `Score this interview response on a scale of 0-10 and provide constructive feedback.
-Question: ${QUESTIONS[index].question}
-Response: ${response.answer}
-
-Evaluate based on:
-- Relevance and directness
-- Clarity and structure
-- Depth and specific examples
-- Professionalism
-
-Return ONLY valid JSON: {"score": X, "feedback": "..."}`
-                  }]
-                }],
-                generationConfig: {
-                  temperature: 0.3,
-                  maxOutputTokens: 500
-                }
-              })
-            }
-          );
-
-          const data = await result.json();
-          const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{"score": 5, "feedback": "Unable to score"}';
-          
-          const jsonMatch = text.match(/\{[^}]+\}/);
-          const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { score: 5, feedback: "Unable to score" };
-
-          return {
-            ...response,
-            score: parsed.score,
-            feedback: parsed.feedback
-          };
-        } catch (error) {
-          console.error('Scoring error:', error);
-          return {
-            ...response,
-            score: 5,
-            feedback: "Unable to score this response."
-          };
-        }
-      })
-    );
-
-    const avgScore = scoredResponses.reduce((sum, r) => sum + (r.score || 0), 0) / scoredResponses.length;
-    setResponses(scoredResponses);
-    setOverallScore(avgScore);
-    setIsScoring(false);
-
-    // Save to database
     try {
-      const { submitGameResult } = await import('@/lib/supabase');
-      await submitGameResult('scenario_challenge', scoredResponses, {
-        gameId: 'interview',
-        gameName: 'Interview Assessment',
-        timestamp: new Date(),
-        finalScore: avgScore * 10,
-        competencies: [],
-        rawData: { responses: scoredResponses }
-      });
+      // Submit to backend for AI scoring
+      const result = await submitAIGame('ai_debate', allResponses);
+      
+      const scoredResponses = result.scoredResponses || allResponses.map(r => ({
+        ...r,
+        score: 5,
+        feedback: 'Scored by backend'
+      }));
+      
+      const avgScore = scoredResponses.reduce((sum: number, r: any) => sum + (r.score || 0), 0) / scoredResponses.length;
+      setResponses(scoredResponses);
+      setOverallScore(avgScore);
+      setIsScoring(false);
     } catch (error) {
-      console.error('Error saving result:', error);
+      console.error('Error scoring responses:', error);
+      setIsScoring(false);
     }
   };
 

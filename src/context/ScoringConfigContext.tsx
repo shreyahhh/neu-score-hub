@@ -3,7 +3,20 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ScoringConfig } from '@/lib/types';
 import { DEFAULT_CONFIG } from '@/lib/config';
-import { getActiveScoringVersion, GameType, saveNewScoringVersion } from '@/lib/supabase';
+import { loadActiveGameConfig, saveNewGameConfig } from '@/lib/api';
+
+export type GameType = 
+  | 'mental_math_sprint'
+  | 'face_name_match'
+  | 'sign_sudoku'
+  | 'stroop_test'
+  | 'card_flip_challenge'
+  | 'scenario_challenge'
+  | 'ai_debate'
+  | 'creative_uses'
+  | 'statement_reasoning'
+  | 'vocab_challenge'
+  | 'lucky_flip';
 
 interface ScoringConfigContextType {
   config: any; // Config from active versions
@@ -116,8 +129,8 @@ export function ScoringConfigProvider({ children }: { children: ReactNode }) {
       const configs: any = {};
       for (const gameType of gameTypes) {
         try {
-          const version = await getActiveScoringVersion(gameType);
-          configs[gameType] = version.config;
+          const versionConfig = await loadActiveGameConfig(gameType);
+          configs[gameType] = versionConfig;
         } catch (error) {
           console.warn(`No active version for ${gameType}, using defaults`);
           configs[gameType] = getDefaultConfig(gameType);
@@ -134,12 +147,12 @@ export function ScoringConfigProvider({ children }: { children: ReactNode }) {
 
   const loadGameConfig = async (gameType: GameType) => {
     try {
-      const version = await getActiveScoringVersion(gameType);
+      const versionConfig = await loadActiveGameConfig(gameType);
       setConfig((prev: any) => ({
         ...prev,
-        [gameType]: version.config,
+        [gameType]: versionConfig,
       }));
-      return version.config;
+      return versionConfig;
     } catch (error) {
       console.error(`Failed to load config for ${gameType}:`, error);
       const defaultConfig = getDefaultConfig(gameType);
@@ -153,7 +166,7 @@ export function ScoringConfigProvider({ children }: { children: ReactNode }) {
 
   const updateConfig = async (gameType: GameType, newConfig: any, description?: string) => {
     try {
-      await saveNewScoringVersion(gameType, newConfig, description);
+      await saveNewGameConfig(gameType, newConfig, description);
       setConfig((prev: any) => ({
         ...prev,
         [gameType]: newConfig,

@@ -8,7 +8,7 @@ import { ProgressBar } from '@/components/game/ProgressBar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { useScoringConfig } from '@/context/ScoringConfigContext';
 import { calculateMentalMathScore } from '@/lib/scoring';
-import { supabase } from '@/lib/supabase';
+import { submitGame } from '@/lib/api';
 
 // Problem sequence
 const PROBLEMS = [
@@ -152,8 +152,7 @@ const MentalMathEasy = () => {
 
     // Save to database using new backend
     try {
-      const { submitGameResult } = await import('@/lib/supabase');
-      await submitGameResult('mental_math_sprint', finalResponses, gameResult);
+      await submitGame('mental_math_sprint', finalResponses);
     } catch (error) {
       console.error('Error saving result:', error);
     }

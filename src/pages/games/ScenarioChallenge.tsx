@@ -8,8 +8,9 @@ import { Timer } from '@/components/game/Timer';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { useScoringConfig } from '@/context/ScoringConfigContext';
 import { calculateScenarioChallengeScore } from '@/lib/scoring';
-import { supabase } from '@/lib/supabase';
+import { submitAIGame } from '@/lib/api';
 import { SCENARIOS } from '@/data/scenarioQuestions';
+
 const TIME_PER_QUESTION = 60; // 1 minute
 
 type GameState = 'instructions' | 'playing' | 'results';
@@ -71,43 +72,41 @@ const ScenarioChallenge = () => {
   const finishGame = async (finalResponses: any[]) => {
     setIsTimerRunning(false);
     
-    // Mock AI scores for now
-    const mockAiScores = {
-      reasoning: 75,
-      decisionMaking: 80,
-      empathy: 85,
-      creativity: 70,
-      communication: 78,
-    };
-
-    const competencies = [
-      { name: 'Reasoning', score: mockAiScores.reasoning, weight: 0.3, weightedScore: mockAiScores.reasoning * 0.3 },
-      { name: 'Decision Making', score: mockAiScores.decisionMaking, weight: 0.3, weightedScore: mockAiScores.decisionMaking * 0.3 },
-      { name: 'Empathy', score: mockAiScores.empathy, weight: 0.2, weightedScore: mockAiScores.empathy * 0.2 },
-      { name: 'Creativity', score: mockAiScores.creativity, weight: 0.1, weightedScore: mockAiScores.creativity * 0.1 },
-      { name: 'Communication', score: mockAiScores.communication, weight: 0.1, weightedScore: mockAiScores.communication * 0.1 },
-    ];
-
-    const finalScore = competencies.reduce((sum, c) => sum + c.weightedScore, 0);
-
-    const gameResult = {
-      gameId: 'scenario-challenge',
-      gameName: 'Scenario Challenge',
-      timestamp: new Date(),
-      finalScore,
-      competencies,
-      rawData: { responses: finalResponses, aiScores: mockAiScores }
-    };
-    
-    setResult(gameResult);
-    setGameState('results');
-
-    // Save to database
     try {
-      const { submitGameResult } = await import('@/lib/supabase');
-      await submitGameResult('scenario_challenge', finalResponses, gameResult);
+      // Submit to backend for AI scoring
+      const result = await submitAIGame('scenario_challenge', finalResponses);
+      
+      const aiScores = result.aiScores || {
+        reasoning: 75,
+        decisionMaking: 80,
+        empathy: 85,
+        creativity: 70,
+        communication: 78,
+      };
+
+      const competencies = [
+        { name: 'Reasoning', score: aiScores.reasoning, weight: 0.3, weightedScore: aiScores.reasoning * 0.3 },
+        { name: 'Decision Making', score: aiScores.decisionMaking, weight: 0.3, weightedScore: aiScores.decisionMaking * 0.3 },
+        { name: 'Empathy', score: aiScores.empathy, weight: 0.2, weightedScore: aiScores.empathy * 0.2 },
+        { name: 'Creativity', score: aiScores.creativity, weight: 0.1, weightedScore: aiScores.creativity * 0.1 },
+        { name: 'Communication', score: aiScores.communication, weight: 0.1, weightedScore: aiScores.communication * 0.1 },
+      ];
+
+      const finalScore = competencies.reduce((sum, c) => sum + c.weightedScore, 0);
+
+      const gameResult = {
+        gameId: 'scenario-challenge',
+        gameName: 'Scenario Challenge',
+        timestamp: new Date(),
+        finalScore,
+        competencies,
+        rawData: { responses: finalResponses, aiScores }
+      };
+      
+      setResult(gameResult);
+      setGameState('results');
     } catch (error) {
-      console.error('Error saving result:', error);
+      console.error('Error finishing game:', error);
     }
   };
 
