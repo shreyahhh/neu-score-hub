@@ -118,8 +118,17 @@ const MentalMathEasy = () => {
     setIsTimerRunning(false);
     
     try {
+      // Transform data to match backend's expected format
+      const raw_data = finalResponses.map(r => ({
+        problem: `${r.previousBalance} ${r.operator} ${r.operand}`,
+        user_answer: r.userAnswer,
+        correct_answer: r.correctAnswer,
+        is_correct: r.isCorrect,
+        time_taken: r.timeTaken
+      }));
+      
       // Submit to backend for scoring
-      const result = await submitGame('mental_math_sprint', finalResponses);
+      const result = await submitGame('mental_math_sprint', raw_data);
       
       // Backend returns the full game result with scores
       setResult(result);

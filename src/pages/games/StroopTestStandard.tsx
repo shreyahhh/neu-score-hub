@@ -125,8 +125,18 @@ const StroopTestStandard = () => {
     setIsTimerRunning(false);
     
     try {
+      // Transform data to match backend's expected format
+      const raw_data = finalResponses.map(r => ({
+        word: r.word,
+        color: r.color,
+        user_response: r.userAnswer,
+        is_correct: r.isCorrect,
+        is_interference: r.hadInterference,
+        time_taken: r.responseTime / 1000
+      }));
+      
       // Submit to backend for scoring
-      const result = await submitGame('stroop_test', finalResponses);
+      const result = await submitGame('stroop_test', raw_data);
       
       // Backend returns the full game result with scores
       setResult(result);
