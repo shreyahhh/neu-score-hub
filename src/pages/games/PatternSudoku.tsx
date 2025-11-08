@@ -5,6 +5,7 @@ import { Grid, Play, Home } from 'lucide-react';
 import { Timer } from '@/components/game/Timer';
 import { useNavigate } from 'react-router-dom';
 import { EASY_SUDOKU, MEDIUM_SUDOKU, HARD_SUDOKU, Pattern } from '@/data/sudokuQuestions';
+import { submitGame } from '@/lib/api';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 type Cell = { value: Pattern; isFixed: boolean; isUserEntry: boolean };
@@ -134,58 +135,38 @@ const PatternSudoku = () => {
     }));
   };
 
-  const handleGameComplete = () => {
-    calculateScores();
+  const handleGameComplete = async () => {
+    setIsTimerRunning(false);
+    
+    try {
+      // Prepare raw data for backend
+      const rawData = {
+        difficulty,
+        emptyCells: stats.emptyCells,
+        correctEntries: stats.correctEntries,
+        incorrectEntries: stats.incorrectEntries,
+        totalAttempts: stats.totalAttempts,
+        timeLeft: stats.timeLeft,
+        totalTime: stats.totalTime,
+      };
+      
+      // Submit to backend for scoring
+      const result = await submitGame('sign_sudoku', rawData);
+      
+      // Backend returns the full game result with scores
+      setStats(prev => ({
+        ...prev,
+        scores: result.scores || {}
+      }));
+      setGameState('results');
+    } catch (error) {
+      console.error('Error submitting game:', error);
+    }
   };
 
   const handleTimeout = () => {
     setIsTimerRunning(false);
     handleGameComplete();
-  };
-
-  const calculateScores = () => {
-    const diffMultiplier = difficulty === 'easy' ? 1.0 : difficulty === 'medium' ? 1.25 : 1.5;
-    
-    // Enhanced scoring formulas
-    const accuracy = Math.max(0, Math.min(100,
-      ((stats.correctEntries / stats.emptyCells) * 100) - (stats.incorrectEntries * 5)
-    ));
-    
-    const reasoning = Math.min(100,
-      (stats.correctEntries / (stats.totalAttempts || 1)) * 100 * diffMultiplier
-    );
-    
-    const timeSpent = stats.totalTime - stats.timeLeft;
-    const avgTimePerCorrect = timeSpent / (stats.correctEntries + 1);
-    const speed = Math.max(0, Math.min(100,
-      (stats.timeLeft / stats.totalTime * 60) + (40 / (avgTimePerCorrect + 1))
-    ));
-    
-    const math = Math.min(100, (stats.correctEntries / stats.emptyCells) * 100);
-    
-    const attentionToDetail = Math.min(100,
-      (accuracy * 0.7) + ((stats.correctEntries / (stats.totalAttempts || 1)) * 30)
-    );
-    
-    const mentalStamina = (accuracy + reasoning + speed + math + attentionToDetail) / 5;
-    
-    const overall = (accuracy * 0.3) + (reasoning * 0.3) + (attentionToDetail * 0.2) + 
-                    (speed * 0.1) + (math * 0.1);
-    
-    setStats(prev => ({
-      ...prev,
-      scores: {
-        accuracy: Math.round(accuracy),
-        reasoning: Math.round(reasoning),
-        speed: Math.round(speed),
-        math: Math.round(math),
-        attentionToDetail: Math.round(attentionToDetail),
-        mentalStamina: Math.round(mentalStamina),
-        overall: Math.round(overall)
-      }
-    }));
-    
-    setGameState('results');
   };
 
   if (gameState === 'welcome') {

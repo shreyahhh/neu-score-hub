@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { ScoringConfig } from '@/lib/types';
-import { DEFAULT_CONFIG } from '@/lib/config';
 import { loadActiveGameConfig, saveNewGameConfig } from '@/lib/api';
 
 export type GameType = 

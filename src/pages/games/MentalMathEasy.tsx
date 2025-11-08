@@ -6,8 +6,6 @@ import { Calculator, Play } from 'lucide-react';
 import { Timer } from '@/components/game/Timer';
 import { ProgressBar } from '@/components/game/ProgressBar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
-import { useScoringConfig } from '@/context/ScoringConfigContext';
-import { calculateMentalMathScore } from '@/lib/scoring';
 import { submitGame } from '@/lib/api';
 
 // Problem sequence
@@ -27,7 +25,6 @@ const PROBLEMS = [
 type GameState = 'instructions' | 'playing' | 'results';
 
 const MentalMathEasy = () => {
-  const { config } = useScoringConfig();
   const [gameState, setGameState] = useState<GameState>('instructions');
   const [currentProblem, setCurrentProblem] = useState(0);
   const [currentBalance, setCurrentBalance] = useState(100);
@@ -120,41 +117,15 @@ const MentalMathEasy = () => {
   const finishGame = async (finalResponses: any[]) => {
     setIsTimerRunning(false);
     
-    // Calculate metrics
-    const correct = finalResponses.filter(r => r.isCorrect).length;
-    const total = finalResponses.length;
-    const totalTime = (Date.now() - gameStartTime) / 1000;
-    
-    // Calculate percentage error (for graded mode)
-    const errors = finalResponses.map(r => {
-      const expected = r.correctAnswer;
-      const actual = r.userAnswer;
-      if (expected === 0) return actual === 0 ? 0 : 100;
-      return Math.abs((actual - expected) / expected) * 100;
-    });
-    const avgPercentError = errors.reduce((sum, e) => sum + e, 0) / errors.length;
-
-    // Calculate score using scoring engine
-    const gameConfig = config.mental_math_sprint || {
-      final_weights: { accuracy: 0.4, speed: 0.3, quantitative_aptitude: 0.2, mental_stamina: 0.1 }
-    };
-    const gameResult = calculateMentalMathScore(gameConfig, {
-      correct,
-      total,
-      percentError: avgPercentError,
-      timeTaken: totalTime,
-      maxTime: total * timePerQuestion,
-      numOperations: total,
-    });
-
-    setResult(gameResult);
-    setGameState('results');
-
-    // Save to database using new backend
     try {
-      await submitGame('mental_math_sprint', finalResponses);
+      // Submit to backend for scoring
+      const result = await submitGame('mental_math_sprint', finalResponses);
+      
+      // Backend returns the full game result with scores
+      setResult(result);
+      setGameState('results');
     } catch (error) {
-      console.error('Error saving result:', error);
+      console.error('Error submitting game:', error);
     }
   };
 

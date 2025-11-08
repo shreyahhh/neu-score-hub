@@ -6,8 +6,6 @@ import { MessageSquare, Play } from 'lucide-react';
 import { ProgressBar } from '@/components/game/ProgressBar';
 import { Timer } from '@/components/game/Timer';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
-import { useScoringConfig } from '@/context/ScoringConfigContext';
-import { calculateScenarioChallengeScore } from '@/lib/scoring';
 import { submitAIGame } from '@/lib/api';
 import { SCENARIOS } from '@/data/scenarioQuestions';
 
@@ -16,7 +14,6 @@ const TIME_PER_QUESTION = 60; // 1 minute
 type GameState = 'instructions' | 'playing' | 'results';
 
 const ScenarioChallenge = () => {
-  const { config } = useScoringConfig();
   const [gameState, setGameState] = useState<GameState>('instructions');
   const [currentScenario] = useState(SCENARIOS[0]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -76,34 +73,8 @@ const ScenarioChallenge = () => {
       // Submit to backend for AI scoring
       const result = await submitAIGame('scenario_challenge', finalResponses);
       
-      const aiScores = result.aiScores || {
-        reasoning: 75,
-        decisionMaking: 80,
-        empathy: 85,
-        creativity: 70,
-        communication: 78,
-      };
-
-      const competencies = [
-        { name: 'Reasoning', score: aiScores.reasoning, weight: 0.3, weightedScore: aiScores.reasoning * 0.3 },
-        { name: 'Decision Making', score: aiScores.decisionMaking, weight: 0.3, weightedScore: aiScores.decisionMaking * 0.3 },
-        { name: 'Empathy', score: aiScores.empathy, weight: 0.2, weightedScore: aiScores.empathy * 0.2 },
-        { name: 'Creativity', score: aiScores.creativity, weight: 0.1, weightedScore: aiScores.creativity * 0.1 },
-        { name: 'Communication', score: aiScores.communication, weight: 0.1, weightedScore: aiScores.communication * 0.1 },
-      ];
-
-      const finalScore = competencies.reduce((sum, c) => sum + c.weightedScore, 0);
-
-      const gameResult = {
-        gameId: 'scenario-challenge',
-        gameName: 'Scenario Challenge',
-        timestamp: new Date(),
-        finalScore,
-        competencies,
-        rawData: { responses: finalResponses, aiScores }
-      };
-      
-      setResult(gameResult);
+      // Backend returns the full game result with scores
+      setResult(result);
       setGameState('results');
     } catch (error) {
       console.error('Error finishing game:', error);

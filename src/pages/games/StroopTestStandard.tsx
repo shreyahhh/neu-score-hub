@@ -5,8 +5,6 @@ import { Eye, Play } from 'lucide-react';
 import { Timer } from '@/components/game/Timer';
 import { ProgressBar } from '@/components/game/ProgressBar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
-import { useScoringConfig } from '@/context/ScoringConfigContext';
-import { calculateStroopScore } from '@/lib/scoring';
 import { submitGame } from '@/lib/api';
 
 // Question pool (30 questions)
@@ -46,7 +44,6 @@ const QUESTION_POOL = [
 type GameState = 'instructions' | 'playing' | 'results';
 
 const StroopTestStandard = () => {
-  const { config } = useScoringConfig();
   const [gameState, setGameState] = useState<GameState>('instructions');
   const [selectedQuestions, setSelectedQuestions] = useState<typeof QUESTION_POOL>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -55,7 +52,7 @@ const StroopTestStandard = () => {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  const timePerQuestion = config.stroopTest.speed.timeMultiplier / 20; // Convert to seconds
+  const timePerQuestion = 3; // 3 seconds per question
 
   const startGame = () => {
     // Randomly select 10 questions from pool
@@ -127,30 +124,15 @@ const StroopTestStandard = () => {
   const finishGame = async (finalResponses: any[]) => {
     setIsTimerRunning(false);
     
-    // Calculate metrics
-    const correct = finalResponses.filter(r => r.isCorrect).length;
-    const total = finalResponses.length;
-    const avgTime = finalResponses.reduce((sum, r) => sum + r.responseTime, 0) / total / 1000;
-    const interferenceErrors = finalResponses.filter(r => r.hadInterference && !r.isCorrect).length;
-    const cognitiveFlexScore = 100 - (interferenceErrors / total * 100);
-
-    // Calculate score using scoring engine
-    const gameResult = calculateStroopScore(config.stroopTest, {
-      correct,
-      total,
-      avgTime,
-      maxTime: timePerQuestion,
-      cognitiveFlexScore,
-    });
-
-    setResult(gameResult);
-    setGameState('results');
-
-    // Save to database
     try {
-      await submitGame('stroop_test', finalResponses);
+      // Submit to backend for scoring
+      const result = await submitGame('stroop_test', finalResponses);
+      
+      // Backend returns the full game result with scores
+      setResult(result);
+      setGameState('results');
     } catch (error) {
-      console.error('Error saving result:', error);
+      console.error('Error submitting game:', error);
     }
   };
 
