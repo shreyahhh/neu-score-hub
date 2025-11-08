@@ -1,209 +1,121 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { MessageSquare, Play } from 'lucide-react';
-import { ProgressBar } from '@/components/game/ProgressBar';
-import { Timer } from '@/components/game/Timer';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
+import { submitAIGame, getGameContent } from '@/lib/api';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
-import { submitAIGame } from '@/lib/api';
-import { SCENARIOS } from '@/data/scenarioQuestions';
+import { GameResult } from '@/lib/types';
 
-const TIME_PER_QUESTION = 60; // 1 minute
+const GAME_TYPE = 'scenario_challenge';
 
-type GameState = 'instructions' | 'playing' | 'results';
+interface Scenario {
+    id: string | number;
+    title: string;
+    description: string;
+    questions: {
+        id: string | number;
+        text: string;
+    }[];
+}
 
 const ScenarioChallenge = () => {
-  const [gameState, setGameState] = useState<GameState>('instructions');
-  const [currentScenario] = useState(SCENARIOS[0]);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [currentAnswer, setCurrentAnswer] = useState('');
-  const [responses, setResponses] = useState<any[]>([]);
-  const [result, setResult] = useState<any>(null);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [questionStartTime, setQuestionStartTime] = useState(0);
+    const { user } = useAuth();
+    const [scenario, setScenario] = useState<Scenario | null>(null);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+    const [currentAnswer, setCurrentAnswer] = useState('');
+    const [isFinished, setIsFinished] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [finalScore, setFinalScore] = useState<GameResult | null>(null);
 
-  const startGame = () => {
-    setGameState('playing');
-    setCurrentQuestion(0);
-    setCurrentAnswer('');
-    setResponses([]);
-    setQuestionStartTime(Date.now());
-    setIsTimerRunning(true);
-  };
+    useEffect(() => {
+        const fetchScenario = async () => {
+            try {
+                setLoading(true);
+                // Assuming getGameContent returns the full scenario object with questions
+                const fetchedScenario = await getGameContent(GAME_TYPE);
+                setScenario(fetchedScenario);
+            } catch (error) {
+                console.error("Failed to load scenario:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchScenario();
+    }, []);
 
-  const handleSubmitResponse = async () => {
-    if (!currentAnswer.trim()) return;
+    const handleSubmitResponse = async () => {
+        if (!user || !currentAnswer.trim() || !scenario) return;
 
-    const question = currentScenario.questions[currentQuestion];
-    const timeTaken = (Date.now() - questionStartTime) / 1000;
-    
-    const response = {
-      questionId: question.id,
-      questionText: question.text,
-      questionType: question.type,
-      answer: currentAnswer,
-      timeTaken,
-      wordCount: currentAnswer.split(' ').length,
+        setSubmitting(true);
+        try {
+            const question = scenario.questions[currentQuestionIndex];
+            const responseData = {
+                scenario_text: scenario.description,
+                question_text: question.text,
+                response_text: currentAnswer,
+                response_length: currentAnswer.length,
+            };
+
+            // Submit each answer individually and get a score
+            const result = await submitAIGame(GAME_TYPE, responseData, user.id);
+
+            // Move to the next question or finish the game
+            if (currentQuestionIndex < scenario.questions.length - 1) {
+                setCurrentQuestionIndex(currentQuestionIndex + 1);
+                setCurrentAnswer('');
+            } else {
+                setFinalScore(result); // Set the final score from the last submission
+                setIsFinished(true);
+            }
+        } catch (error) {
+            console.error("Error submitting scenario response:", error);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
-    const newResponses = [...responses, response];
-    setResponses(newResponses);
-
-    if (currentQuestion < currentScenario.questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-      setCurrentAnswer('');
-      setQuestionStartTime(Date.now());
-      setIsTimerRunning(false);
-      setTimeout(() => setIsTimerRunning(true), 100);
-    } else {
-      setIsTimerRunning(false);
-      await finishGame(newResponses);
+    if (loading) {
+        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
-  };
 
-  const handleTimeout = () => {
-    handleSubmitResponse();
-  };
-
-  const finishGame = async (finalResponses: any[]) => {
-    setIsTimerRunning(false);
-    
-    try {
-      // Submit to backend for AI scoring
-      const result = await submitAIGame('scenario_challenge', finalResponses);
-      
-      // Backend returns the full game result with scores
-      setResult(result);
-      setGameState('results');
-    } catch (error) {
-      console.error('Error finishing game:', error);
+    if (isFinished && finalScore) {
+        return <ScoreDisplay result={finalScore} />;
     }
-  };
 
-  if (gameState === 'instructions') {
+    if (!scenario) {
+        return <div className="text-center text-destructive">Failed to load game content.</div>;
+    }
+
+    const currentQuestion = scenario.questions[currentQuestionIndex];
+
     return (
-      <div className="container mx-auto px-6 py-8">
-        <div className="max-w-2xl mx-auto">
-          <Card>
+        <Card className="max-w-3xl mx-auto">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-2xl">
-                <MessageSquare className="w-6 h-6 text-primary" />
-                Scenario Challenge (AI)
-              </CardTitle>
+                <CardTitle>{scenario.title}</CardTitle>
+                <CardDescription>{scenario.description}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Instructions</h3>
-                <p className="text-muted-foreground mb-4">
-                  You will be presented with a workplace scenario and 4 questions.
-                </p>
-                <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                  <li>Read the scenario carefully</li>
-                  <li>Type your answer to each question</li>
-                  <li>You have 1 minute per question</li>
-                  <li>Click "Next Question" to submit and continue</li>
-                </ul>
-              </div>
-              <div className="bg-muted p-4 rounded-lg">
-                <h4 className="font-semibold mb-2">Game Details:</h4>
-                <ul className="space-y-1 text-sm">
-                  <li>• 1 scenario with 4 questions</li>
-                  <li>• 1 minute per question</li>
-                  <li>• Text input only</li>
-                  <li>• Measures reasoning, empathy, creativity, and communication</li>
-                </ul>
-              </div>
-              <Button onClick={startGame} className="w-full" size="lg">
-                <Play className="w-4 h-4 mr-2" />
-                Start Challenge
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-
-  if (gameState === 'playing') {
-    const question = currentScenario.questions[currentQuestion];
-    return (
-      <div className="container mx-auto px-6 py-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Left: Scenario (always visible) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Scenario</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-muted p-4 rounded-lg">
-                  <h3 className="font-bold mb-2">{currentScenario.title}</h3>
-                  <p className="text-sm">{currentScenario.description}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Right: Question and Response */}
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>
-                    Question {currentQuestion + 1} of {currentScenario.questions.length}
-                  </CardTitle>
-                  <Timer
-                    isRunning={isTimerRunning}
-                    initialTime={TIME_PER_QUESTION}
-                    countDown
-                    maxTime={TIME_PER_QUESTION}
-                    onComplete={handleTimeout}
-                  />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <ProgressBar current={currentQuestion + 1} total={currentScenario.questions.length} />
-                
-                <div className="bg-primary/5 p-4 rounded-lg">
-                  <p className="font-medium">{question.text}</p>
-                </div>
-
+            <CardContent>
                 <div className="space-y-4">
-                  <Textarea
-                    value={currentAnswer}
-                    onChange={(e) => setCurrentAnswer(e.target.value)}
-                    placeholder="Type your response here..."
-                    rows={8}
-                    autoFocus
-                  />
-                  <Button 
-                    onClick={handleSubmitResponse} 
-                    className="w-full" 
-                    size="lg" 
-                    disabled={!currentAnswer.trim()}
-                  >
-                    {currentQuestion < currentScenario.questions.length - 1 ? 'Next Question' : 'Finish Challenge'}
-                  </Button>
+                    <p className="font-semibold">{currentQuestion.text}</p>
+                    <p className="text-sm text-muted-foreground">
+                        Question {currentQuestionIndex + 1} of {scenario.questions.length}
+                    </p>
+                    <Textarea
+                        value={currentAnswer}
+                        onChange={(e) => setCurrentAnswer(e.target.value)}
+                        placeholder="Describe your response to the situation..."
+                        rows={8}
+                    />
+                    <Button onClick={handleSubmitResponse} disabled={submitting || !currentAnswer.trim()}>
+                        {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {currentQuestionIndex < scenario.questions.length - 1 ? 'Submit and Go to Next Question' : 'Finish & Submit'}
+                    </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+            </CardContent>
+        </Card>
     );
-  }
-
-  if (gameState === 'results' && result) {
-    return (
-      <div className="container mx-auto px-6 py-8">
-        <div className="max-w-2xl mx-auto">
-          <ScoreDisplay result={result} />
-        </div>
-      </div>
-    );
-  }
-
-  return null;
 };
 
 export default ScenarioChallenge;
