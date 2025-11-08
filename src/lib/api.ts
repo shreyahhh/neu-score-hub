@@ -1,5 +1,5 @@
 // Central API Client for NeuRazor Backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 /**
  * Submit game result for action-based games
@@ -83,9 +83,32 @@ export async function loadActiveGameConfig(gameType: string) {
   }
 }
 
+export async function getGameContent(gameType: string) {
+  try {
+    // NOTE: Assumes a backend endpoint exists to provide game content.
+    const response = await fetch(`${API_BASE_URL}/api/games/content/${gameType}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error:', errorText);
+      throw new Error(`Failed to load game content: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Backend returned an error for game content.');
+    }
+    return result.data;
+  } catch (error) {
+    console.error('Error loading game content:', error);
+    throw error;
+  }
+}
+
 /**
  * Save new scoring configuration
  */
+
 export async function saveNewGameConfig(
   gameType: string,
   config: any,
