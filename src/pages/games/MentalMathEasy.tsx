@@ -10,16 +10,16 @@ import { submitGame } from '@/lib/api';
 
 // Problem sequence
 const PROBLEMS = [
-  { id: 1, startValue: 103, operand: 9, operator: '-' as const, correctAnswer: 94 },
-  { id: 2, startValue: 105, operand: 11, operator: '+' as const, correctAnswer: 116 },
-  { id: 3, startValue: 109, operand: 6, operator: '-' as const, correctAnswer: 103 },
-  { id: 4, startValue: 101, operand: 14, operator: '+' as const, correctAnswer: 115 },
-  { id: 5, startValue: 104, operand: 13, operator: '-' as const, correctAnswer: 91 },
-  { id: 6, startValue: 109, operand: 7, operator: '+' as const, correctAnswer: 116 },
-  { id: 7, startValue: 108, operand: 15, operator: '-' as const, correctAnswer: 93 },
-  { id: 8, startValue: 103, operand: 19, operator: '+' as const, correctAnswer: 122 },
-  { id: 9, startValue: 107, operand: 10, operator: '-' as const, correctAnswer: 97 },
-  { id: 10, startValue: 102, operand: 13, operator: '+' as const, correctAnswer: 115 },
+  { id: 1, startValue: 107, operand: 9, operator: '-' as const, correctAnswer: 98 },
+  { id: 2, startValue: 108, operand: 11, operator: '+' as const, correctAnswer: 119 },
+  { id: 3, startValue: 103, operand: 6, operator: '-' as const, correctAnswer: 97 },
+  { id: 4, startValue: 109, operand: 14, operator: '+' as const, correctAnswer: 123 },
+  { id: 5, startValue: 102, operand: 13, operator: '-' as const, correctAnswer: 89 },
+  { id: 6, startValue: 101, operand: 7, operator: '+' as const, correctAnswer: 108 },
+  { id: 7, startValue: 107, operand: 15, operator: '-' as const, correctAnswer: 92 },
+  { id: 8, startValue: 109, operand: 19, operator: '+' as const, correctAnswer: 128 },
+  { id: 9, startValue: 106, operand: 10, operator: '-' as const, correctAnswer: 96 },
+  { id: 10, startValue: 105, operand: 13, operator: '+' as const, correctAnswer: 118 },
 ];
 
 type GameState = 'instructions' | 'playing' | 'results';
@@ -190,8 +190,8 @@ const MentalMathEasy = () => {
   if (gameState === 'playing') {
     const problem = PROBLEMS[currentProblem];
     return (
-      <div className="container mx-auto px-6 py-8">
-        <div className="max-w-2xl mx-auto space-y-6">
+      <div className="container mx-auto px-6 py-8 min-h-screen flex items-center justify-center">
+        <div className="max-w-2xl w-full space-y-6">
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">

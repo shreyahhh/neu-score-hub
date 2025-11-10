@@ -4,8 +4,8 @@ import { MessageSquare } from 'lucide-react';
 
 const DebateMode = () => {
   return (
-    <div className="container mx-auto px-6 py-8">
-      <div className="max-w-2xl mx-auto">
+    <div className="container mx-auto px-6 py-8 min-h-screen flex items-center justify-center">
+      <div className="max-w-2xl w-full">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-2xl">

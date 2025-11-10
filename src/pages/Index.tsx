@@ -167,11 +167,11 @@ const Index = () => {
               </div>
 
               <div className="p-4 border rounded-lg hover:border-primary transition-colors">
-                <h3 className="font-semibold mb-2">Sign Sudoku</h3>
+                <h3 className="font-semibold mb-2">Statement Reasoning</h3>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Tests: Reasoning, Attention to Detail, Math, Speed
+                  Tests: Reasoning, Logical Analysis, Critical Thinking
                 </p>
-                <Link to="/games/sign-sudoku-easy">
+                <Link to="/games/statement-reasoning">
                   <Button size="sm" variant="outline">Try It</Button>
                 </Link>
               </div>

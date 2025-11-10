@@ -1,8 +1,8 @@
 // Central API Client for NeuRazor Backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-// Default test user ID (from backend documentation)
-const DEFAULT_USER_ID = '53f77b43-d71a-4edf-8b80-c70b975264d8';
+// User ID from environment variable or fallback to default
+export const DEFAULT_USER_ID = import.meta.env.VITE_USER_ID || '53f77b43-d71a-4edf-8b80-c70b975264d8';
 
 /**
  * Submit game result for action-based games
@@ -240,6 +240,45 @@ export async function getGameContent(gameType: string) {
       { id: 2, text: 'Describe a situation where you had to motivate a team. What was the outcome?', competency: 'Leadership' },
       { id: 3, text: 'How do you handle constructive criticism?', competency: 'Growth Mindset' },
       { id: 4, text: 'Walk me through a complex problem you solved. What was your process?', competency: 'Problem-Solving' },
+    ];
+  } else if (gameType === 'statement_reasoning') {
+    return [
+      {
+        id: 1,
+        statements: [
+          'All successful entrepreneurs take calculated risks.',
+          'Sarah started her business with minimal capital.',
+          'Sarah\'s business is now profitable after two years.'
+        ],
+        question: 'What logical connection can you identify between these statements?'
+      },
+      {
+        id: 2,
+        statements: [
+          'Regular exercise improves cardiovascular health.',
+          'People who exercise regularly have lower stress levels.',
+          'Studies show exercise releases endorphins that improve mood.'
+        ],
+        question: 'How do these statements relate to each other? Explain the underlying pattern.'
+      },
+      {
+        id: 3,
+        statements: [
+          'The company implemented flexible work hours.',
+          'Employee satisfaction scores increased by 30%.',
+          'Productivity metrics showed a 15% improvement.'
+        ],
+        question: 'What reasoning connects these three statements?'
+      },
+      {
+        id: 4,
+        statements: [
+          'Reading enhances vocabulary and comprehension.',
+          'Students who read regularly perform better on standardized tests.',
+          'Reading develops critical thinking and analytical skills.'
+        ],
+        question: 'Analyze the relationship between these statements. What is the core connection?'
+      }
     ];
   }
   throw new Error(`Mock data for gameType: ${gameType} not found.`);

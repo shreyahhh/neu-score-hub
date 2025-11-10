@@ -1,7 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GameResult } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Trophy, TrendingUp, BarChart3 } from 'lucide-react';
 import { transformGameResult } from '@/lib/transformers';
 
 interface ScoreDisplayProps {
@@ -10,6 +12,8 @@ interface ScoreDisplayProps {
 }
 
 export function ScoreDisplay({ result, gameType }: ScoreDisplayProps) {
+  const navigate = useNavigate();
+  
   // Transform backend format to frontend format if needed
   const gameResult: GameResult = result.competencies 
     ? result as GameResult
@@ -128,6 +132,20 @@ export function ScoreDisplay({ result, gameType }: ScoreDisplayProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Actions */}
+      {gameType && (
+        <div className="flex justify-center gap-4">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/results/${gameType}`)}
+            className="gap-2"
+          >
+            <BarChart3 className="w-4 h-4" />
+            View History & Compare
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

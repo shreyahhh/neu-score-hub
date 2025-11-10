@@ -8,9 +8,11 @@ import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { GameResult } from '@/lib/types';
 import { Timer } from '@/components/game/Timer'; // Import Timer component
 
+import { DEFAULT_USER_ID } from '@/lib/api';
+
 type AuthUser = { id: string };
 const useAuth = (): { user: AuthUser | null } => {
-    return { user: { id: 'test-user-id' } }; // Mock user for development
+    return { user: { id: DEFAULT_USER_ID } }; // Uses user ID from .env
 };
 
 const GAME_TYPE = 'scenario_challenge';
@@ -187,7 +189,8 @@ const ScenarioChallenge = () => {
     const currentQuestion = scenario.questions[currentQuestionIndex];
 
     return (
-        <Card className="max-w-3xl mx-auto">
+        <div className="container mx-auto px-6 py-8 min-h-screen flex items-center justify-center">
+        <Card className="max-w-3xl w-full">
             <CardHeader>
                 <div className="flex justify-between items-center">
                     <CardTitle>{scenario.title}</CardTitle>
@@ -221,6 +224,7 @@ const ScenarioChallenge = () => {
                 </div>
             </CardContent>
         </Card>
+        </div>
     );
 };
 

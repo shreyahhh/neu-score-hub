@@ -7,11 +7,14 @@ import { ScoringConfigProvider } from "@/context/ScoringConfigContext";
 import { Sidebar } from "@/components/Sidebar";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ResultsDashboard from "./pages/ResultsDashboard";
+import GameResultsHistory from "./pages/GameResultsHistory";
+import VersionComparison from "./pages/VersionComparison";
 
 // Game pages
 import MentalMathEasy from "./pages/games/MentalMathEasy";
-import FaceNameMatchEasy from "./pages/games/FaceNameMatchEasy";
-import SignSudokuEasy from "./pages/games/SignSudokuEasy";
+import FaceNameMatchEasy from "./pages/games/FaceNameMatch";
+import StatementReasoning from "./pages/games/StatementReasoning";
 import StroopTestStandard from "./pages/games/StroopTestStandard";
 import CardFlipEasy from "./pages/games/CardFlipEasy";
 import ScenarioChallenge from "./pages/games/ScenarioChallenge";
@@ -35,10 +38,15 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 
+                {/* Results Routes */}
+                <Route path="/results" element={<ResultsDashboard />} />
+                <Route path="/results/:gameType" element={<GameResultsHistory />} />
+                <Route path="/results/:gameType/compare" element={<VersionComparison />} />
+                
                 {/* Game Routes */}
                 <Route path="/games/mental-math-easy" element={<MentalMathEasy />} />
                 <Route path="/games/face-name-match-easy" element={<FaceNameMatchEasy />} />
-                <Route path="/games/sign-sudoku-easy" element={<SignSudokuEasy />} />
+                <Route path="/games/statement-reasoning" element={<StatementReasoning />} />
                 <Route path="/games/stroop-test-standard" element={<StroopTestStandard />} />
                 <Route path="/games/card-flip-easy" element={<CardFlipEasy />} />
                 <Route path="/games/scenario-challenge" element={<ScenarioChallenge />} />

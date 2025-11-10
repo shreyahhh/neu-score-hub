@@ -141,6 +141,16 @@ export interface CreativeUsesConfig {
   aiPrompt: string;
 }
 
+// Statement Reasoning (AI)
+export interface StatementReasoningConfig {
+  weights: {
+    reasoning: number;
+    logicalAnalysis: number;
+    criticalThinking: number;
+  };
+  aiPrompt: string;
+}
+
 // Global configuration interface
 export interface ScoringConfig {
   mentalMath: MentalMathConfig;
@@ -151,4 +161,5 @@ export interface ScoringConfig {
   scenarioChallenge: ScenarioChallengeConfig;
   debateMode: DebateModeConfig;
   creativeUses: CreativeUsesConfig;
+  statementReasoning: StatementReasoningConfig;
 }

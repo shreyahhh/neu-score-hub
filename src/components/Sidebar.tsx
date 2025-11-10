@@ -13,7 +13,8 @@ import {
   Lightbulb,
   Settings,
   Home,
-  ChevronRight
+  ChevronRight,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScoringControlsModal } from './ScoringControlsModal';
@@ -22,7 +23,7 @@ import { cn } from '@/lib/utils';
 const games = [
   { name: 'Mental Math Sprint', path: '/games/mental-math-easy', icon: Calculator },
   { name: 'Face-Name Match', path: '/games/face-name-match-easy', icon: Users },
-  { name: 'Sign Sudoku', path: '/games/sign-sudoku-easy', icon: Grid3x3 },
+  { name: 'Statement Reasoning', path: '/games/statement-reasoning', icon: Lightbulb },
   { name: 'Stroop Test', path: '/games/stroop-test-standard', icon: Eye },
   { name: 'Card Flip Challenge', path: '/games/card-flip-easy', icon: CreditCard },
   { name: 'Scenario Challenge', path: '/games/scenario-challenge', icon: MessageSquare },
@@ -67,6 +68,21 @@ export function Sidebar() {
           >
             <Home className="w-5 h-5" />
             <span className="font-medium">Home</span>
+          </NavLink>
+
+          <NavLink
+            to="/results"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 px-3 py-2 rounded-lg mb-2 transition-colors',
+                isActive
+                  ? 'bg-sidebar-accent text-sidebar-primary'
+                  : 'hover:bg-sidebar-accent/50'
+              )
+            }
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span className="font-medium">All Results</span>
           </NavLink>
 
           <div className="mt-6">

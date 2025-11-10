@@ -254,8 +254,8 @@ const PatternSudoku = () => {
     const config = DIFFICULTY_CONFIG[difficulty];
     
     return (
-      <div className="container mx-auto px-6 py-8">
-        <div className="max-w-4xl mx-auto">
+      <div className="container mx-auto px-6 py-8 min-h-screen flex items-center justify-center">
+        <div className="max-w-4xl w-full">
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">

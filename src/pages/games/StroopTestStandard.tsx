@@ -7,45 +7,32 @@ import { ProgressBar } from '@/components/game/ProgressBar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { submitGame } from '@/lib/api';
 
-// Question pool (30 questions)
-const QUESTION_POOL = [
-  { id: 1, word: 'RED', color: '#FF0000', task: 'name_color', correct: 'RED', options: ['RED', 'BLUE'] },
-  { id: 2, word: 'BLUE', color: '#0000FF', task: 'read_word', correct: 'BLUE', options: ['BLUE', 'GREEN'] },
-  { id: 3, word: 'GREEN', color: '#00FF00', task: 'name_color', correct: 'GREEN', options: ['GREEN', 'ORANGE'] },
-  { id: 4, word: 'RED', color: '#0000FF', task: 'name_color', correct: 'BLUE', options: ['RED', 'BLUE'], interference: true },
-  { id: 5, word: 'ORANGE', color: '#FFA500', task: 'read_word', correct: 'ORANGE', options: ['ORANGE', 'PURPLE'] },
-  { id: 6, word: 'BLUE', color: '#FF0000', task: 'name_color', correct: 'RED', options: ['BLUE', 'RED'], interference: true },
-  { id: 7, word: 'PURPLE', color: '#800080', task: 'name_color', correct: 'PURPLE', options: ['PURPLE', 'BROWN'] },
-  { id: 8, word: 'GREEN', color: '#FFA500', task: 'name_color', correct: 'ORANGE', options: ['GREEN', 'ORANGE'], interference: true },
-  { id: 9, word: 'BROWN', color: '#8B4513', task: 'read_word', correct: 'BROWN', options: ['BROWN', 'GRAY'] },
-  { id: 10, word: 'GRAY', color: '#808080', task: 'name_color', correct: 'GRAY', options: ['GRAY', 'RED'] },
-  { id: 11, word: 'RED', color: '#00FF00', task: 'name_color', correct: 'GREEN', options: ['RED', 'GREEN'], interference: true },
-  { id: 12, word: 'BLUE', color: '#800080', task: 'name_color', correct: 'PURPLE', options: ['BLUE', 'PURPLE'], interference: true },
-  { id: 13, word: 'ORANGE', color: '#FF0000', task: 'name_color', correct: 'RED', options: ['ORANGE', 'RED'], interference: true },
-  { id: 14, word: 'GREEN', color: '#00FF00', task: 'read_word', correct: 'GREEN', options: ['GREEN', 'BLUE'] },
-  { id: 15, word: 'PURPLE', color: '#0000FF', task: 'name_color', correct: 'BLUE', options: ['PURPLE', 'BLUE'], interference: true },
-  { id: 16, word: 'BROWN', color: '#8B4513', task: 'name_color', correct: 'BROWN', options: ['BROWN', 'ORANGE'] },
-  { id: 17, word: 'GRAY', color: '#00FF00', task: 'name_color', correct: 'GREEN', options: ['GRAY', 'GREEN'], interference: true },
-  { id: 18, word: 'RED', color: '#FF0000', task: 'read_word', correct: 'RED', options: ['RED', 'PURPLE'] },
-  { id: 19, word: 'BLUE', color: '#FFA500', task: 'name_color', correct: 'ORANGE', options: ['BLUE', 'ORANGE'], interference: true },
-  { id: 20, word: 'GREEN', color: '#800080', task: 'name_color', correct: 'PURPLE', options: ['GREEN', 'PURPLE'], interference: true },
-  { id: 21, word: 'ORANGE', color: '#FFA500', task: 'name_color', correct: 'ORANGE', options: ['ORANGE', 'RED'] },
-  { id: 22, word: 'PURPLE', color: '#800080', task: 'read_word', correct: 'PURPLE', options: ['PURPLE', 'GRAY'] },
-  { id: 23, word: 'BROWN', color: '#0000FF', task: 'name_color', correct: 'BLUE', options: ['BROWN', 'BLUE'], interference: true },
-  { id: 24, word: 'GRAY', color: '#808080', task: 'read_word', correct: 'GRAY', options: ['GRAY', 'BROWN'] },
-  { id: 25, word: 'RED', color: '#800080', task: 'name_color', correct: 'PURPLE', options: ['RED', 'PURPLE'], interference: true },
-  { id: 26, word: 'BLUE', color: '#0000FF', task: 'name_color', correct: 'BLUE', options: ['BLUE', 'GREEN'] },
-  { id: 27, word: 'GREEN', color: '#FF0000', task: 'name_color', correct: 'RED', options: ['GREEN', 'RED'], interference: true },
-  { id: 28, word: 'ORANGE', color: '#00FF00', task: 'name_color', correct: 'GREEN', options: ['ORANGE', 'GREEN'], interference: true },
-  { id: 29, word: 'PURPLE', color: '#FFA500', task: 'name_color', correct: 'ORANGE', options: ['PURPLE', 'ORANGE'], interference: true },
-  { id: 30, word: 'BROWN', color: '#8B4513', task: 'name_color', correct: 'BROWN', options: ['BROWN', 'GRAY'] },
+// Hardcoded questions - always use these 10 questions
+const QUESTIONS = [
+  { id: 1, word: "RED", color: "green", correctAnswer: "green", task: 'name_color', correct: 'green', options: ['red', 'green', 'blue', 'yellow'], interference: true },
+  { id: 2, word: "BLUE", color: "red", correctAnswer: "red", task: 'name_color', correct: 'red', options: ['red', 'blue', 'green', 'yellow'], interference: true },
+  { id: 3, word: "GREEN", color: "blue", correctAnswer: "blue", task: 'name_color', correct: 'blue', options: ['green', 'blue', 'red', 'yellow'], interference: true },
+  { id: 4, word: "YELLOW", color: "red", correctAnswer: "red", task: 'name_color', correct: 'red', options: ['yellow', 'red', 'blue', 'green'], interference: true },
+  { id: 5, word: "RED", color: "blue", correctAnswer: "blue", task: 'name_color', correct: 'blue', options: ['red', 'blue', 'green', 'yellow'], interference: true },
+  { id: 6, word: "BLUE", color: "green", correctAnswer: "green", task: 'name_color', correct: 'green', options: ['blue', 'green', 'red', 'yellow'], interference: true },
+  { id: 7, word: "GREEN", color: "yellow", correctAnswer: "yellow", task: 'name_color', correct: 'yellow', options: ['green', 'yellow', 'red', 'blue'], interference: true },
+  { id: 8, word: "YELLOW", color: "blue", correctAnswer: "blue", task: 'name_color', correct: 'blue', options: ['yellow', 'blue', 'red', 'green'], interference: true },
+  { id: 9, word: "RED", color: "yellow", correctAnswer: "yellow", task: 'name_color', correct: 'yellow', options: ['red', 'yellow', 'blue', 'green'], interference: true },
+  { id: 10, word: "BLUE", color: "yellow", correctAnswer: "yellow", task: 'name_color', correct: 'yellow', options: ['blue', 'yellow', 'red', 'green'], interference: true }
 ];
+
+// Color mapping for display
+const COLOR_MAP: Record<string, string> = {
+  'red': '#FF0000',
+  'blue': '#0000FF',
+  'green': '#00FF00',
+  'yellow': '#FFFF00'
+};
 
 type GameState = 'instructions' | 'playing' | 'results';
 
 const StroopTestStandard = () => {
   const [gameState, setGameState] = useState<GameState>('instructions');
-  const [selectedQuestions, setSelectedQuestions] = useState<typeof QUESTION_POOL>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<any[]>([]);
   const [questionStartTime, setQuestionStartTime] = useState<number>(0);
@@ -55,10 +42,7 @@ const StroopTestStandard = () => {
   const timePerQuestion = 3; // 3 seconds per question
 
   const startGame = () => {
-    // Randomly select 10 questions from pool
-    const shuffled = [...QUESTION_POOL].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, 10);
-    setSelectedQuestions(selected);
+    // Use hardcoded questions
     setCurrentQuestionIndex(0);
     setResponses([]);
     setGameState('playing');
@@ -67,9 +51,9 @@ const StroopTestStandard = () => {
   };
 
   const handleAnswer = (answer: string) => {
-    const question = selectedQuestions[currentQuestionIndex];
+    const question = QUESTIONS[currentQuestionIndex];
     const responseTime = Date.now() - questionStartTime;
-    const isCorrect = answer === question.correct;
+    const isCorrect = answer.toLowerCase() === question.correct.toLowerCase();
 
     const response = {
       questionId: question.id,
@@ -86,16 +70,17 @@ const StroopTestStandard = () => {
     const newResponses = [...responses, response];
     setResponses(newResponses);
 
-    if (currentQuestionIndex < selectedQuestions.length - 1) {
+    if (currentQuestionIndex < QUESTIONS.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setQuestionStartTime(Date.now());
+      setIsTimerRunning(true); // Restart timer
     } else {
       finishGame(newResponses);
     }
   };
 
   const handleTimeout = () => {
-    const question = selectedQuestions[currentQuestionIndex];
+    const question = QUESTIONS[currentQuestionIndex];
     const response = {
       questionId: question.id,
       word: question.word,
@@ -111,7 +96,7 @@ const StroopTestStandard = () => {
     const newResponses = [...responses, response];
     setResponses(newResponses);
 
-    if (currentQuestionIndex < selectedQuestions.length - 1) {
+    if (currentQuestionIndex < QUESTIONS.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setQuestionStartTime(Date.now());
       setIsTimerRunning(true); // Simply restart the timer
@@ -176,7 +161,7 @@ const StroopTestStandard = () => {
               <div className="bg-muted p-4 rounded-lg">
                 <h4 className="font-semibold mb-2">Game Details:</h4>
                 <ul className="space-y-1 text-sm">
-                  <li>• 10 questions</li>
+                  <li>• {QUESTIONS.length} questions</li>
                   <li>• {timePerQuestion} seconds per question</li>
                   <li>• No feedback during the game</li>
                 </ul>
@@ -193,10 +178,10 @@ const StroopTestStandard = () => {
   }
 
   if (gameState === 'playing') {
-    const question = selectedQuestions[currentQuestionIndex];
+    const question = QUESTIONS[currentQuestionIndex];
     return (
-      <div className="container mx-auto px-6 py-8">
-        <div className="max-w-2xl mx-auto space-y-6">
+      <div className="container mx-auto px-6 py-8 min-h-screen flex items-center justify-center">
+        <div className="max-w-2xl w-full space-y-6">
           <Card>
             <CardHeader>
               <div className="flex justify-between items-center">
@@ -215,7 +200,7 @@ const StroopTestStandard = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <ProgressBar current={currentQuestionIndex + 1} total={selectedQuestions.length} />
+              <ProgressBar current={currentQuestionIndex + 1} total={QUESTIONS.length} />
               
               <div className="text-center space-y-4">
                 <div className="text-sm font-medium text-muted-foreground">
@@ -225,7 +210,7 @@ const StroopTestStandard = () => {
                 <div className="py-12">
                   <div 
                     className="text-6xl font-bold"
-                    style={{ color: question.color }}
+                    style={{ color: COLOR_MAP[question.color.toLowerCase()] || question.color }}
                   >
                     {question.word}
                   </div>
@@ -239,7 +224,7 @@ const StroopTestStandard = () => {
                     onClick={() => handleAnswer(option)}
                     variant="outline"
                     size="lg"
-                    className="h-16 text-lg"
+                    className="h-16 text-lg capitalize"
                   >
                     {option}
                   </Button>

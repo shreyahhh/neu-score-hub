@@ -1,0 +1,35 @@
+# ============================================
+# Frontend Environment Variables (.env file)
+# ============================================
+# 
+# Location: Root of project (same folder as package.json)
+# 
+# IMPORTANT:
+# - No quotes around values
+# - No spaces around the = sign
+# - Restart dev server after changing this file
+# ============================================
+
+# Backend API URL (your Node.js backend)
+VITE_API_BASE_URL=http://localhost:3000
+
+# Supabase Configuration (for Face-Name Match game)
+# Get these from: https://app.supabase.com/project/_/settings/api
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvdXItcHJvamVjdC1pZCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjE2MjM5MDIyfQ.your-anon-key-here
+
+# ============================================
+# HOW TO GET SUPABASE VALUES:
+# ============================================
+# 1. Go to https://app.supabase.com
+# 2. Select your project
+# 3. Go to Settings → API
+# 4. Copy:
+#    - Project URL → VITE_SUPABASE_URL
+#    - anon public key → VITE_SUPABASE_ANON_KEY
+# 
+# ⚠️ IMPORTANT: Use the "anon" or "public" key, NOT the "service_role" key!
+#    The service_role key should only be used in your backend.
+# ============================================
+
+
