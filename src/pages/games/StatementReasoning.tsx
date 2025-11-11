@@ -2,324 +2,372 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Play, Lightbulb } from 'lucide-react';
-import { submitAIGame, getGameContent } from '@/lib/api';
+import { Loader2, Play, Home } from 'lucide-react';
+import { submitAIGame, getGameContent, DEFAULT_USER_ID } from '@/lib/api';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { GameResult } from '@/lib/types';
 import { Timer } from '@/components/game/Timer';
-
-import { DEFAULT_USER_ID } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 
 type AuthUser = { id: string };
 const useAuth = (): { user: AuthUser | null } => {
-  return { user: { id: DEFAULT_USER_ID } }; // Uses user ID from .env
+    return { user: { id: DEFAULT_USER_ID } };
 };
 
 const GAME_TYPE = 'statement_reasoning';
-const TIME_PER_QUESTION = 300; // 5 minutes per question
+const TIME_LIMIT = 180; // 3 minutes per question
 
 interface StatementSet {
-  id: string | number;
-  statements: string[];
-  question?: string; // Optional question prompt
+    content_id?: string;
+    game_type?: string;
+    statements: string[]; // Array of 3 statements
+    question: string; // Question about the connection
+    time_limit?: number;
 }
 
 const StatementReasoning = () => {
-  const { user } = useAuth();
-  const [statementSets, setStatementSets] = useState<StatementSet[]>([]);
-  const [currentSetIndex, setCurrentSetIndex] = useState(0);
-  const [currentResponse, setCurrentResponse] = useState('');
-  const [isFinished, setIsFinished] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [finalScore, setFinalScore] = useState<GameResult | null>(null);
-  const [questionStartTime, setQuestionStartTime] = useState<number>(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [gameStarted, setGameStarted] = useState(false);
+    const navigate = useNavigate();
+    const { user } = useAuth();
+    const [statementSet, setStatementSet] = useState<StatementSet | null>(null);
+    const [response, setResponse] = useState('');
+    const [isFinished, setIsFinished] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [result, setResult] = useState<GameResult | null>(null);
+    const [gameStarted, setGameStarted] = useState(false);
+    const [startTime, setStartTime] = useState<number>(0);
+    const [isTimerRunning, setIsTimerRunning] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(TIME_LIMIT);
 
-  useEffect(() => {
-    const fetchStatementSets = async () => {
-      try {
-        setLoading(true);
-        const fetchedSets = await getGameContent(GAME_TYPE) as StatementSet[];
-        setStatementSets(fetchedSets);
-      } catch (error) {
-        console.error("Failed to load statement sets:", error);
-      } finally {
-        setLoading(false);
-      }
+    // Fetch statement set from backend
+    useEffect(() => {
+        const fetchStatementSet = async () => {
+            try {
+                setLoading(true);
+                const contentData = await getGameContent(GAME_TYPE);
+                console.log('Fetched statement reasoning content from database:', contentData);
+                
+                // Validate and transform data structure
+                if (!contentData || !contentData.statements || !Array.isArray(contentData.statements) || contentData.statements.length === 0) {
+                    throw new Error('Invalid statement set data from database');
+                }
+                
+                const transformedSet: StatementSet = {
+                    content_id: contentData.content_id,
+                    game_type: contentData.game_type || GAME_TYPE,
+                    statements: contentData.statements,
+                    question: contentData.question || 'What logical connection can you identify between these statements?',
+                    time_limit: contentData.time_limit || TIME_LIMIT
+                };
+                
+                setStatementSet(transformedSet);
+                setTimeLeft(transformedSet.time_limit || TIME_LIMIT);
+            } catch (error: any) {
+                console.error("Failed to load statement set from database:", error);
+                console.warn("Using fallback statement set");
+                // Fallback statement set
+                const fallbackSet: StatementSet = {
+                    content_id: 'fallback-reasoning-1',
+                    game_type: GAME_TYPE,
+                    statements: [
+                        'All successful entrepreneurs take calculated risks.',
+                        'Sarah started her business with minimal capital.',
+                        'Sarah\'s business is now profitable after two years.'
+                    ],
+                    question: 'What logical connection can you identify between these statements?',
+                    time_limit: TIME_LIMIT
+                };
+                setStatementSet(fallbackSet);
+                setTimeLeft(TIME_LIMIT);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchStatementSet();
+    }, []);
+
+    const startGame = () => {
+        if (!statementSet) return;
+        setGameStarted(true);
+        setResponse('');
+        setStartTime(Date.now());
+        setIsTimerRunning(true);
+        setTimeLeft(statementSet.time_limit || TIME_LIMIT);
     };
-    fetchStatementSets();
-  }, []);
 
-  const startGame = () => {
-    setGameStarted(true);
-    setQuestionStartTime(Date.now());
-    setIsTimerRunning(true);
-  };
+    const handleSubmit = async () => {
+        if (!statementSet || !response.trim()) {
+            alert('Please provide a response before submitting.');
+            return;
+        }
 
-  const handleSubmitResponse = async () => {
-    if (!user || !currentResponse.trim() || statementSets.length === 0) return;
+        if (!user) {
+            alert('User not found. Please refresh the page.');
+            return;
+        }
 
-    setSubmitting(true);
-    try {
-      const currentSet = statementSets[currentSetIndex];
-      const timeTaken = (Date.now() - questionStartTime) / 1000;
-
-      const responseData = {
-        statements: currentSet.statements,
-        response_text: currentResponse,
-        response_length: currentResponse.length,
-        time_taken: timeTaken,
-      };
-
-      // Submit each response individually
-      const result = await submitAIGame(GAME_TYPE, responseData, user.id);
-
-      // Move to next set or finish
-      if (currentSetIndex < statementSets.length - 1) {
+        setSubmitting(true);
         setIsTimerRunning(false);
-        setCurrentResponse('');
-        setTimeout(() => {
-          setCurrentSetIndex(prev => prev + 1);
-          setQuestionStartTime(Date.now());
-          setIsTimerRunning(true);
-        }, 100);
-      } else {
-        setFinalScore(result);
-        setIsFinished(true);
+
+        try {
+            const timeTaken = startTime > 0 ? (Date.now() - startTime) / 1000 : TIME_LIMIT - timeLeft;
+            
+            // Format data according to backend documentation
+            const responseData = {
+                statements: statementSet.statements,
+                response_text: response.trim(),
+                response_length: response.trim().length,
+                time_taken: timeTaken,
+                time_limit: statementSet.time_limit || TIME_LIMIT
+            };
+
+            console.log('Submitting statement reasoning game with data:', { 
+                gameType: GAME_TYPE, 
+                responseData, 
+                contentId: statementSet.content_id 
+            });
+
+            // Submit with content_id to track which statement set was used
+            const gameResult = await submitAIGame(
+                GAME_TYPE,
+                responseData,
+                user.id,
+                statementSet.content_id || undefined
+            );
+
+            console.log('Statement reasoning game result from backend:', gameResult);
+
+            // Backend returns { session_id, version_used, ai_scores, final_scores } for AI games
+            if (gameResult && (gameResult.final_scores || gameResult.scores || gameResult.session_id)) {
+                setResult(gameResult);
+                setIsFinished(true);
+            } else {
+                console.error('Invalid result from backend - missing scores or session_id:', gameResult);
+                alert(`Failed to get scores. Backend returned: ${JSON.stringify(gameResult)}`);
+            }
+        } catch (error: any) {
+            console.error("Error submitting statement reasoning game:", error);
+            const errorMessage = error?.message || 'Unknown error';
+            console.error('Error details:', { error, message: errorMessage, stack: error?.stack });
+            alert(`Failed to submit game: ${errorMessage}. Check console for details.`);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleTimeout = async () => {
         setIsTimerRunning(false);
-      }
-    } catch (error) {
-      console.error("Error submitting statement reasoning response:", error);
-      alert("Failed to submit response. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+        // Auto-submit with whatever response we have
+        if (response.trim()) {
+            await handleSubmit();
+        } else {
+            // Submit empty response if timeout
+            setSubmitting(true);
+            try {
+                const timeTaken = TIME_LIMIT;
+                const responseData = {
+                    statements: statementSet?.statements || [],
+                    response_text: '',
+                    response_length: 0,
+                    time_taken: timeTaken,
+                    time_limit: statementSet?.time_limit || TIME_LIMIT
+                };
 
-  const handleTimeout = async () => {
-    if (!user || statementSets.length === 0) return;
+                const gameResult = await submitAIGame(
+                    GAME_TYPE,
+                    responseData,
+                    user?.id || DEFAULT_USER_ID,
+                    statementSet?.content_id || undefined
+                );
 
-    setIsTimerRunning(false);
-    setSubmitting(true);
-    try {
-      const currentSet = statementSets[currentSetIndex];
-      const timeTaken = TIME_PER_QUESTION; // Use full time limit
+                if (gameResult && (gameResult.final_scores || gameResult.scores || gameResult.session_id)) {
+                    setResult(gameResult);
+                    setIsFinished(true);
+                }
+            } catch (error: any) {
+                console.error("Error submitting statement reasoning game (timeout):", error);
+                alert(`Failed to submit game: ${error?.message || 'Unknown error'}`);
+            } finally {
+                setSubmitting(false);
+            }
+        }
+    };
 
-      const responseData = {
-        statements: currentSet.statements,
-        response_text: currentResponse || '', // Submit whatever they have
-        response_length: currentResponse.length,
-        time_taken: timeTaken,
-      };
+    const restartGame = () => {
+        setGameStarted(false);
+        setResponse('');
+        setIsFinished(false);
+        setResult(null);
+        setStartTime(0);
+        setIsTimerRunning(false);
+        setTimeLeft(statementSet?.time_limit || TIME_LIMIT);
+    };
 
-      const result = await submitAIGame(GAME_TYPE, responseData, user.id);
-
-      if (currentSetIndex < statementSets.length - 1) {
-        setCurrentResponse('');
-        setTimeout(() => {
-          setCurrentSetIndex(prev => prev + 1);
-          setQuestionStartTime(Date.now());
-          setIsTimerRunning(true);
-        }, 100);
-      } else {
-        setFinalScore(result);
-        setIsFinished(true);
-      }
-    } catch (error) {
-      console.error("Error submitting on timeout:", error);
-      alert("Failed to submit response. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Instructions screen
-  if (!gameStarted) {
     if (loading) {
-      return (
-        <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-          <Card className="max-w-md w-full">
-            <CardContent className="py-12 text-center">
-              <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
-              <p className="text-muted-foreground">Loading statement sets...</p>
-            </CardContent>
-          </Card>
-        </div>
-      );
+        return (
+            <div className="flex flex-col justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                <p className="text-muted-foreground">Loading statement set from backend...</p>
+            </div>
+        );
     }
 
-    if (statementSets.length === 0) {
-      return (
-        <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-          <Card className="max-w-md w-full">
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No statement sets available.</p>
-            </CardContent>
-          </Card>
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-6">
-        <Card className="max-w-2xl w-full">
-          <CardHeader>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center">
-                <Lightbulb className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-3xl">Statement Reasoning</CardTitle>
-                <CardDescription>Analyze connections between statements</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="p-4 bg-muted rounded-lg">
-              <h3 className="font-semibold mb-2">How to Play:</h3>
-              <ul className="text-sm space-y-2 text-muted-foreground">
-                <li>1️⃣ <strong>Read the statements</strong> - You'll see {statementSets.length} sets of statements</li>
-                <li>2️⃣ <strong>Analyze the connection</strong> - Explain how the statements relate to each other</li>
-                <li>3️⃣ <strong>Write your reasoning</strong> - Provide a clear, logical explanation</li>
-                <li>4️⃣ <strong>Time limit:</strong> {TIME_PER_QUESTION / 60} minutes per set</li>
-              </ul>
-            </div>
-
-            <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
-              <p className="text-sm text-primary font-medium">
-                💡 Tip: Focus on logical connections, cause-and-effect relationships, or underlying patterns between the statements.
-              </p>
-            </div>
-
-            <Button onClick={startGame} size="lg" className="w-full">
-              <Play className="w-4 h-4 mr-2" />
-              Start Game
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Loading/Submitting state
-  if (submitting) {
-    return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-        <Card className="max-w-md w-full">
-          <CardContent className="py-12 text-center">
-            <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
-            <p className="text-muted-foreground">Submitting your response...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Results screen
-  if (isFinished && finalScore) {
-    return (
-      <div className="min-h-screen bg-gradient-subtle p-6">
-        <div className="max-w-4xl mx-auto">
-          <ScoreDisplay result={finalScore} gameType={GAME_TYPE} />
-          <div className="mt-6 flex gap-4 justify-center">
-            <Button onClick={() => window.location.reload()} size="lg">
-              <Play className="w-4 h-4 mr-2" />
-              Play Again
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Game playing screen
-  const currentSet = statementSets[currentSetIndex];
-  const isLastSet = currentSetIndex === statementSets.length - 1;
-
-  return (
-    <div className="min-h-screen bg-gradient-subtle p-6">
-      <div className="max-w-3xl mx-auto">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <CardTitle>Statement Reasoning</CardTitle>
-                <CardDescription>
-                  Set {currentSetIndex + 1} of {statementSets.length}
-                </CardDescription>
-              </div>
-              <Timer
-                isRunning={isTimerRunning}
-                initialTime={TIME_PER_QUESTION}
-                countDown
-                maxTime={TIME_PER_QUESTION}
-                onComplete={handleTimeout}
-                key={currentSetIndex} // Reset timer for each question
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Statements Display */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Statements:</h3>
-              <div className="space-y-3">
-                {currentSet.statements.map((statement, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 bg-muted rounded-lg border-l-4 border-primary"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
-                        {idx + 1}
-                      </div>
-                      <p className="flex-1 text-sm leading-relaxed">{statement}</p>
+    if (isFinished && result) {
+        return (
+            <div className="min-h-screen bg-gradient-subtle p-6">
+                <div className="max-w-4xl mx-auto">
+                    <ScoreDisplay result={result} gameType={GAME_TYPE} />
+                    <div className="mt-6 flex gap-4 justify-center">
+                        <Button onClick={restartGame} size="lg">
+                            <Play className="w-4 h-4 mr-2" />
+                            Play Again
+                        </Button>
+                        <Button onClick={() => navigate('/')} variant="outline" size="lg">
+                            <Home className="w-4 h-4 mr-2" />
+                            Back to Home
+                        </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                </div>
             </div>
+        );
+    }
 
-            {/* Question Prompt (if available) */}
-            {currentSet.question && (
-              <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg">
-                <p className="font-medium text-primary mb-1">Question:</p>
-                <p className="text-sm">{currentSet.question}</p>
-              </div>
-            )}
-
-            {/* Response Input */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Explain the connection or reasoning between these statements:
-              </label>
-              <Textarea
-                value={currentResponse}
-                onChange={(e) => setCurrentResponse(e.target.value)}
-                placeholder="Write your reasoning here... Be clear and logical in explaining how these statements connect."
-                className="min-h-[200px] text-base"
-                autoFocus
-              />
-              <p className="text-xs text-muted-foreground">
-                {currentResponse.length} characters
-              </p>
+    if (isFinished && submitting) {
+        return (
+            <div className="flex flex-col justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <p className="mt-4 text-muted-foreground">Calculating your score...</p>
             </div>
+        );
+    }
 
-            {/* Submit Button */}
-            <Button
-              onClick={handleSubmitResponse}
-              disabled={!currentResponse.trim()}
-              size="lg"
-              className="w-full"
-            >
-              {isLastSet ? 'Finish & Submit' : 'Submit and Go to Next Set'}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+    if (!statementSet) {
+        return (
+            <div className="container mx-auto px-6 py-8 min-h-screen flex items-center justify-center">
+                <Card className="max-w-2xl w-full">
+                    <CardContent className="py-12 text-center">
+                        <p className="text-destructive">Failed to load statement set.</p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (!gameStarted) {
+        return (
+            <div className="container mx-auto px-6 py-8">
+                <div className="max-w-2xl mx-auto">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-2xl">
+                                Statement Reasoning Challenge
+                            </CardTitle>
+                            <CardDescription>
+                                Analyze the logical connections between statements
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div>
+                                <h3 className="text-lg font-semibold mb-2">Instructions</h3>
+                                <p className="text-muted-foreground mb-4">
+                                    You will be shown three statements. Your task is to identify and explain the logical connection between them.
+                                </p>
+                            </div>
+                            <div className="bg-muted p-4 rounded-lg">
+                                <h4 className="font-semibold mb-2">Game Details:</h4>
+                                <ul className="space-y-1 text-sm">
+                                    <li>• {statementSet.time_limit || TIME_LIMIT} seconds to complete</li>
+                                    <li>• Read all statements carefully</li>
+                                    <li>• Explain the logical connection clearly</li>
+                                    <li>• Be specific and detailed in your response</li>
+                                </ul>
+                            </div>
+                            <Button onClick={startGame} className="w-full" size="lg">
+                                <Play className="w-4 h-4 mr-2" />
+                                Start Game
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="container mx-auto px-6 py-8 min-h-screen">
+            <div className="max-w-3xl mx-auto">
+                <Card>
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                            <CardTitle>Statement Reasoning Challenge</CardTitle>
+                            <Timer
+                                isRunning={isTimerRunning}
+                                initialTime={timeLeft}
+                                countDown
+                                maxTime={statementSet.time_limit || TIME_LIMIT}
+                                onComplete={handleTimeout}
+                                onTick={(time) => setTimeLeft(time)}
+                            />
+                        </div>
+                        <CardDescription>
+                            Time Left: {Math.max(0, timeLeft)}s
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div>
+                            <h3 className="text-lg font-semibold mb-4">Statements:</h3>
+                            <div className="space-y-3">
+                                {statementSet.statements.map((statement, index) => (
+                                    <div key={index} className="p-4 bg-muted rounded-lg">
+                                        <p className="font-semibold mb-1">Statement {index + 1}:</p>
+                                        <p>{statement}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-lg font-semibold mb-2">Question:</h3>
+                            <p className="text-lg">{statementSet.question}</p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium mb-2">
+                                Your Response:
+                            </label>
+                            <Textarea
+                                value={response}
+                                onChange={(e) => setResponse(e.target.value)}
+                                placeholder="Explain the logical connection between these statements..."
+                                className="min-h-[200px]"
+                                disabled={submitting || isFinished}
+                            />
+                            <p className="text-sm text-muted-foreground mt-2">
+                                {response.length} characters
+                            </p>
+                        </div>
+
+                        <Button
+                            onClick={handleSubmit}
+                            className="w-full"
+                            size="lg"
+                            disabled={submitting || isFinished || !response.trim()}
+                        >
+                            {submitting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Submitting...
+                                </>
+                            ) : (
+                                'Submit Response'
+                            )}
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    );
 };
 
 export default StatementReasoning;

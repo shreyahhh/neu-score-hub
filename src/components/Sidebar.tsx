@@ -23,13 +23,11 @@ import { cn } from '@/lib/utils';
 const games = [
   { name: 'Mental Math Sprint', path: '/games/mental-math-easy', icon: Calculator },
   { name: 'Face-Name Match', path: '/games/face-name-match-easy', icon: Users },
-  { name: 'Statement Reasoning', path: '/games/statement-reasoning', icon: Lightbulb },
   { name: 'Stroop Test', path: '/games/stroop-test-standard', icon: Eye },
   { name: 'Card Flip Challenge', path: '/games/card-flip-easy', icon: CreditCard },
   { name: 'Scenario Challenge', path: '/games/scenario-challenge', icon: MessageSquare },
   { name: 'Debate Mode', path: '/games/debate-mode', icon: MessageSquare },
   { name: 'Creative Uses', path: '/games/creative-uses', icon: Lightbulb },
-  { name: 'Interview Assessment', path: '/games/interview', icon: MessageSquare },
   { name: 'Pattern Sudoku', path: '/games/pattern-sudoku', icon: Grid3x3 },
 ];
 

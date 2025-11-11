@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Clock } from 'lucide-react';
 
 interface TimerProps {
@@ -19,6 +19,19 @@ export function Timer({
   maxTime,
 }: TimerProps) {
   const [elapsed, setElapsed] = useState(initialTime);
+  const onTickRef = useRef(onTick);
+  const onCompleteRef = useRef(onComplete);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onTickRef.current = onTick;
+    onCompleteRef.current = onComplete;
+  }, [onTick, onComplete]);
+
+  // Reset elapsed time when initialTime changes
+  useEffect(() => {
+    setElapsed(initialTime);
+  }, [initialTime]);
 
   useEffect(() => {
     if (!isRunning) return;
@@ -27,17 +40,24 @@ export function Timer({
       setElapsed((prev) => {
         const next = countDown ? prev - 1 : prev + 1;
         
-        if (onTick) {
-          onTick(next);
+        // Call onTick from ref
+        if (onTickRef.current) {
+          onTickRef.current(next);
         }
 
-        if (countDown && next <= 0 && onComplete) {
-          onComplete();
+        // Handle countdown completion
+        if (countDown && next <= 0) {
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+          }
           return 0;
         }
 
-        if (maxTime && !countDown && next >= maxTime && onComplete) {
-          onComplete();
+        // Handle maxTime completion
+        if (maxTime && !countDown && next >= maxTime) {
+          if (onCompleteRef.current) {
+            onCompleteRef.current();
+          }
           return maxTime;
         }
 
@@ -46,7 +66,7 @@ export function Timer({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, onTick, onComplete, countDown, maxTime]);
+  }, [isRunning, countDown, maxTime]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(Math.abs(seconds) / 60);

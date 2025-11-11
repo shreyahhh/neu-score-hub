@@ -8,7 +8,7 @@ import { getGameDisplayName } from '@/lib/transformers';
 
 import { DEFAULT_USER_ID } from '@/lib/api';
 
-// All game types in the system
+// All game types in the system (frontend-visible games only)
 const ALL_GAME_TYPES = [
   'mental_math_sprint',
   'stroop_test',
@@ -18,9 +18,9 @@ const ALL_GAME_TYPES = [
   'scenario_challenge',
   'ai_debate',
   'creative_uses',
-  'statement_reasoning',
-  'vocab_challenge',
-  'lucky_flip',
+  // 'statement_reasoning', // Removed from frontend
+  // 'vocab_challenge', // Removed from frontend
+  // 'lucky_flip', // Removed from frontend
 ];
 
 interface GameSummary {
@@ -54,9 +54,12 @@ const ResultsDashboard = () => {
 
       const summaryPromises = ALL_GAME_TYPES.map(async (gameType) => {
         try {
+          console.log(`[ResultsDashboard] Loading results for game type: ${gameType}`);
           const sessions = await getResultsHistory(gameType, DEFAULT_USER_ID);
+          console.log(`[ResultsDashboard] Loaded ${sessions?.length || 0} sessions for ${gameType}:`, sessions);
           
           if (!sessions || sessions.length === 0) {
+            console.log(`[ResultsDashboard] No sessions found for ${gameType}`);
             return {
               game_type: gameType,
               best_score: 0,
@@ -68,25 +71,116 @@ const ResultsDashboard = () => {
             };
           }
 
+          // Log session structure for debugging
+          console.log(`[ResultsDashboard] Sample session for ${gameType}:`, sessions[0]);
+
           const scores = sessions
-            .map((s: any) => s.final_scores?.final_score || s.scores?.final_score || 0)
+            .map((s: any) => {
+              // Try multiple ways to extract the score
+              let score = 0;
+              
+              // Method 1: final_scores.final_score (AI games)
+              if (s.final_scores) {
+                if (typeof s.final_scores === 'string') {
+                  try {
+                    const parsed = JSON.parse(s.final_scores);
+                    score = parsed.final_score || 0;
+                  } catch (e) {
+                    console.warn(`[ResultsDashboard] Failed to parse final_scores as JSON:`, e);
+                  }
+                } else if (typeof s.final_scores === 'object') {
+                  score = s.final_scores.final_score || 0;
+                }
+              }
+              
+              // Method 2: scores.final_score (regular games)
+              if (score === 0 && s.scores) {
+                if (typeof s.scores === 'string') {
+                  try {
+                    const parsed = JSON.parse(s.scores);
+                    score = parsed.final_score || 0;
+                  } catch (e) {
+                    console.warn(`[ResultsDashboard] Failed to parse scores as JSON:`, e);
+                  }
+                } else if (typeof s.scores === 'object') {
+                  score = s.scores.final_score || 0;
+                }
+              }
+              
+              // Method 3: Direct final_score property
+              if (score === 0 && s.final_score) {
+                score = typeof s.final_score === 'number' ? s.final_score : parseFloat(s.final_score) || 0;
+              }
+              
+              // Method 4: Check for ai_scores (AI games might have this)
+              if (score === 0 && s.ai_scores) {
+                // Try to extract score from ai_scores if final_scores is missing
+                let aiScores = s.ai_scores;
+                if (typeof aiScores === 'string') {
+                  try {
+                    aiScores = JSON.parse(aiScores);
+                  } catch (e) {
+                    console.warn(`[ResultsDashboard] Failed to parse ai_scores as JSON:`, e);
+                  }
+                }
+                
+                // Calculate average from ai_scores if it's an object with numeric values
+                if (typeof aiScores === 'object' && aiScores !== null) {
+                  const aiScoreValues = Object.values(aiScores).filter((v: any) => 
+                    typeof v === 'number' && !isNaN(v)
+                  ) as number[];
+                  
+                  if (aiScoreValues.length > 0) {
+                    // Calculate average of AI scores as fallback
+                    score = aiScoreValues.reduce((a, b) => a + b, 0) / aiScoreValues.length;
+                    console.log(`[ResultsDashboard] Calculated score from ai_scores:`, score);
+                  }
+                }
+                
+                if (score === 0) {
+                  console.log(`[ResultsDashboard] Session has ai_scores but no calculable score - scoring may be pending`);
+                }
+              }
+              
+              console.log(`[ResultsDashboard] Session score for ${gameType}:`, {
+                session_id: s.id,
+                final_scores: s.final_scores,
+                scores: s.scores,
+                final_score: s.final_score,
+                ai_scores: s.ai_scores,
+                extracted_score: score,
+                score_type: typeof score
+              });
+              
+              return score;
+            })
             .filter((score: number) => score > 0);
 
+          console.log(`[ResultsDashboard] Valid scores for ${gameType}:`, scores);
+
           if (scores.length === 0) {
+            console.log(`[ResultsDashboard] No valid scores found for ${gameType}, but ${sessions.length} sessions exist`);
+            // Still show attempts even if scores are 0 or missing
             return {
               game_type: gameType,
               best_score: 0,
               avg_score: 0,
               total_attempts: sessions.length,
               last_played: sessions[0]?.created_at || null,
-              active_version: sessions[0]?.scoring_version?.version_name || null,
-              hasData: false,
+              active_version: sessions[0]?.scoring_version?.version_name || sessions[0]?.version_used || null,
+              hasData: sessions.length > 0, // Show if there are any sessions, even without scores
             };
           }
 
           const bestScore = Math.max(...scores);
           const avgScore = scores.reduce((a: number, b: number) => a + b, 0) / scores.length;
           const lastSession = sessions[0]; // Most recent is first
+
+          console.log(`[ResultsDashboard] Successfully loaded ${gameType}:`, {
+            best_score: bestScore,
+            avg_score: avgScore,
+            total_attempts: sessions.length
+          });
 
           return {
             game_type: gameType,
@@ -97,8 +191,13 @@ const ResultsDashboard = () => {
             active_version: lastSession?.scoring_version?.version_name || 'V1',
             hasData: true,
           };
-        } catch (err) {
-          console.error(`Error loading ${gameType}:`, err);
+        } catch (err: any) {
+          console.error(`[ResultsDashboard] Error loading ${gameType}:`, err);
+          console.error(`[ResultsDashboard] Error details:`, {
+            message: err?.message,
+            stack: err?.stack,
+            name: err?.name
+          });
           return {
             game_type: gameType,
             best_score: 0,
@@ -269,22 +368,30 @@ const ResultsDashboard = () => {
                             )}
                           </div>
                           
-                          {summary.hasData ? (
+                          {summary.hasData || summary.total_attempts > 0 ? (
                             <div className="space-y-2">
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <span>Best: <strong className={scoreColor}>{summary.best_score.toFixed(1)}</strong></span>
-                                <span>Avg: <strong className={scoreColor}>{summary.avg_score.toFixed(1)}</strong></span>
-                                <span>{summary.total_attempts} attempts</span>
-                                <span>Last: {formatDate(summary.last_played)}</span>
+                                {summary.avg_score > 0 ? (
+                                  <>
+                                    <span>Best: <strong className={scoreColor}>{summary.best_score.toFixed(1)}</strong></span>
+                                    <span>Avg: <strong className={scoreColor}>{summary.avg_score.toFixed(1)}</strong></span>
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground">Scores pending...</span>
+                                )}
+                                <span>{summary.total_attempts} attempt{summary.total_attempts !== 1 ? 's' : ''}</span>
+                                {summary.last_played && <span>Last: {formatDate(summary.last_played)}</span>}
                               </div>
                               
-                              {/* Progress bar */}
-                              <div className="w-full bg-secondary rounded-full h-2">
-                                <div
-                                  className="bg-gradient-primary h-2 rounded-full transition-all"
-                                  style={{ width: `${Math.min(100, summary.avg_score)}%` }}
-                                />
-                              </div>
+                              {/* Progress bar - only show if there's a score */}
+                              {summary.avg_score > 0 && (
+                                <div className="w-full bg-secondary rounded-full h-2">
+                                  <div
+                                    className="bg-gradient-primary h-2 rounded-full transition-all"
+                                    style={{ width: `${Math.min(100, summary.avg_score)}%` }}
+                                  />
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <p className="text-sm text-muted-foreground">
@@ -294,7 +401,7 @@ const ResultsDashboard = () => {
                         </div>
 
                         <div className="flex gap-2 ml-4">
-                          {summary.hasData ? (
+                          {summary.hasData || summary.total_attempts > 0 ? (
                             <>
                               <Button
                                 asChild

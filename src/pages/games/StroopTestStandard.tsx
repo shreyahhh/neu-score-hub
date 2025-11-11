@@ -7,27 +7,114 @@ import { ProgressBar } from '@/components/game/ProgressBar';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { submitGame } from '@/lib/api';
 
-// Hardcoded questions - always use these 10 questions
-const QUESTIONS = [
-  { id: 1, word: "RED", color: "green", correctAnswer: "green", task: 'name_color', correct: 'green', options: ['red', 'green', 'blue', 'yellow'], interference: true },
-  { id: 2, word: "BLUE", color: "red", correctAnswer: "red", task: 'name_color', correct: 'red', options: ['red', 'blue', 'green', 'yellow'], interference: true },
-  { id: 3, word: "GREEN", color: "blue", correctAnswer: "blue", task: 'name_color', correct: 'blue', options: ['green', 'blue', 'red', 'yellow'], interference: true },
-  { id: 4, word: "YELLOW", color: "red", correctAnswer: "red", task: 'name_color', correct: 'red', options: ['yellow', 'red', 'blue', 'green'], interference: true },
-  { id: 5, word: "RED", color: "blue", correctAnswer: "blue", task: 'name_color', correct: 'blue', options: ['red', 'blue', 'green', 'yellow'], interference: true },
-  { id: 6, word: "BLUE", color: "green", correctAnswer: "green", task: 'name_color', correct: 'green', options: ['blue', 'green', 'red', 'yellow'], interference: true },
-  { id: 7, word: "GREEN", color: "yellow", correctAnswer: "yellow", task: 'name_color', correct: 'yellow', options: ['green', 'yellow', 'red', 'blue'], interference: true },
-  { id: 8, word: "YELLOW", color: "blue", correctAnswer: "blue", task: 'name_color', correct: 'blue', options: ['yellow', 'blue', 'red', 'green'], interference: true },
-  { id: 9, word: "RED", color: "yellow", correctAnswer: "yellow", task: 'name_color', correct: 'yellow', options: ['red', 'yellow', 'blue', 'green'], interference: true },
-  { id: 10, word: "BLUE", color: "yellow", correctAnswer: "yellow", task: 'name_color', correct: 'yellow', options: ['blue', 'yellow', 'red', 'green'], interference: true }
-];
+// Color mapping for display - improved colors for better visibility
 
-// Color mapping for display
 const COLOR_MAP: Record<string, string> = {
-  'red': '#FF0000',
-  'blue': '#0000FF',
-  'green': '#00FF00',
-  'yellow': '#FFFF00'
+  'red': '#DC2626',      // Better red (Tailwind red-600)
+  'blue': '#2563EB',     // Better blue (Tailwind blue-600)
+  'green': '#16A34A',    // Better green (Tailwind green-600)
+  'teal': '#0D9488',     // Teal instead of cyan (Tailwind teal-600)
+  'orange': '#EA580C',   // Better orange (Tailwind orange-600)
+  'purple': '#9333EA',   // Better purple (Tailwind purple-600)
+  'pink': '#DB2777',     // Pink for better visibility (Tailwind pink-600)
+  'gray': '#6B7280'      // Better gray (Tailwind gray-500)
 };
+
+// Available colors for the game - removed yellow, replaced cyan with teal, added pink
+const AVAILABLE_COLORS = ['red', 'blue', 'green', 'teal', 'orange', 'purple', 'pink', 'gray'];
+
+// Generate tricky options based on task
+const generateTrickyOptions = (
+  word: string,
+  fontColor: string,
+  task: 'read_word' | 'name_color',
+  randomFn: () => number
+): Array<{ text: string; color: string }> => {
+  const wordLower = word.toLowerCase();
+  const fontColorLower = fontColor.toLowerCase();
+  
+  let options: Array<{ text: string; color: string }>;
+  
+  if (task === 'read_word') {
+    // Task: Read the word (ignore color)
+    // Example: "RED" in blue -> options: "red" (in red) and "blue" (in red)
+    const correctText = wordLower;
+    const wrongText = fontColorLower;
+    
+    // Both options shown in the word's color to confuse
+    options = [
+      { text: correctText, color: wordLower }, // Correct: "red" in red
+      { text: wrongText, color: wordLower }   // Wrong: "blue" in red (tricky!)
+    ];
+  } else {
+    // Task: Name the color (ignore word)
+    // Example: "RED" in blue -> options: "Blue" (in red) and "Red" (in blue)
+    const correctText = fontColorLower;
+    const wrongText = wordLower;
+    
+    // Options shown in opposite colors to confuse
+    options = [
+      { text: correctText, color: wordLower }, // Correct: "blue" in red (tricky!)
+      { text: wrongText, color: fontColorLower } // Wrong: "red" in blue (tricky!)
+    ];
+  }
+  
+  // Randomize order using seeded random
+  return options.sort(() => randomFn() - 0.5);
+};
+
+// Generate questions - using a fixed seed for consistency
+// In production, you might want to generate these server-side or use a seed
+const generateQuestionsWithSeed = () => {
+  // Use a fixed seed for consistent questions across sessions
+  const seed = 12345;
+  const questions = [];
+  const words = ['RED', 'BLUE', 'GREEN', 'TEAL', 'ORANGE', 'PURPLE', 'PINK', 'GRAY'];
+  
+  // Simple seeded random function
+  let seedValue = seed;
+  const seededRandom = () => {
+    seedValue = (seedValue * 9301 + 49297) % 233280;
+    return seedValue / 233280;
+  };
+  
+  for (let i = 0; i < 10; i++) {
+    const word = words[Math.floor(seededRandom() * words.length)];
+    const wordLower = word.toLowerCase();
+    
+    // Pick a different color for the font
+    const availableFontColors = AVAILABLE_COLORS.filter(c => c !== wordLower);
+    const fontColor = availableFontColors[Math.floor(seededRandom() * availableFontColors.length)];
+    
+    // Alternate between read_word and name_color tasks
+    const task: 'read_word' | 'name_color' = i % 2 === 0 ? 'read_word' : 'name_color';
+    
+    // Determine correct answer
+    const correctAnswer = task === 'read_word' ? wordLower : fontColor;
+    
+    // Generate tricky options
+    const options = generateTrickyOptions(word, fontColor, task, seededRandom);
+    
+    // Check for interference (word and color don't match)
+    const hasInterference = wordLower !== fontColor;
+    
+    questions.push({
+      id: i + 1,
+      word,
+      fontColor,
+      task,
+      correctAnswer,
+      options,
+      interference: hasInterference,
+      interferenceLevel: hasInterference ? 'high' : 'low'
+    });
+  }
+  
+  return questions;
+};
+
+// Generate questions once
+const QUESTIONS = generateQuestionsWithSeed();
 
 type GameState = 'instructions' | 'playing' | 'results';
 
@@ -39,7 +126,7 @@ const StroopTestStandard = () => {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  const timePerQuestion = 3; // 3 seconds per question
+  const timePerQuestion = 5; // 5 seconds per question
 
   const startGame = () => {
     // Use hardcoded questions
@@ -50,21 +137,33 @@ const StroopTestStandard = () => {
     setIsTimerRunning(true);
   };
 
-  const handleAnswer = (answer: string) => {
+  const handleAnswer = (answerText: string, answerColor: string) => {
     const question = QUESTIONS[currentQuestionIndex];
     const responseTime = Date.now() - questionStartTime;
-    const isCorrect = answer.toLowerCase() === question.correct.toLowerCase();
+    const isCorrect = answerText.toLowerCase() === question.correctAnswer.toLowerCase();
+
+    // Find the option that was clicked
+    const selectedOption = question.options.find(
+      opt => opt.text.toLowerCase() === answerText.toLowerCase() && opt.color === answerColor
+    );
 
     const response = {
-      questionId: question.id,
-      word: question.word,
-      color: question.color,
+      question_id: question.id,
+      word_shown: question.word,
+      font_color: COLOR_MAP[question.fontColor.toLowerCase()] || question.fontColor,
       task: question.task,
-      userAnswer: answer,
-      correctAnswer: question.correct,
-      isCorrect,
-      responseTime,
-      hadInterference: question.interference || false,
+      option_1_text: question.options[0].text,
+      option_1_color: COLOR_MAP[question.options[0].color.toLowerCase()] || question.options[0].color,
+      option_2_text: question.options[1].text,
+      option_2_color: COLOR_MAP[question.options[1].color.toLowerCase()] || question.options[1].color,
+      correct_answer: question.correctAnswer,
+      interference_level: question.interferenceLevel,
+      user_answer: answerText,
+      is_correct: isCorrect,
+      response_time_ms: responseTime,
+      max_allowed_time_ms: timePerQuestion * 1000,
+      had_interference: question.interference || false,
+      answered_at: new Date().toISOString()
     };
 
     const newResponses = [...responses, response];
@@ -82,15 +181,22 @@ const StroopTestStandard = () => {
   const handleTimeout = () => {
     const question = QUESTIONS[currentQuestionIndex];
     const response = {
-      questionId: question.id,
-      word: question.word,
-      color: question.color,
+      question_id: question.id,
+      word_shown: question.word,
+      font_color: COLOR_MAP[question.fontColor.toLowerCase()] || question.fontColor,
       task: question.task,
-      userAnswer: null,
-      correctAnswer: question.correct,
-      isCorrect: false,
-      responseTime: timePerQuestion * 1000,
-      hadInterference: question.interference || false,
+      option_1_text: question.options[0].text,
+      option_1_color: COLOR_MAP[question.options[0].color.toLowerCase()] || question.options[0].color,
+      option_2_text: question.options[1].text,
+      option_2_color: COLOR_MAP[question.options[1].color.toLowerCase()] || question.options[1].color,
+      correct_answer: question.correctAnswer,
+      interference_level: question.interferenceLevel,
+      user_answer: null,
+      is_correct: false,
+      response_time_ms: timePerQuestion * 1000,
+      max_allowed_time_ms: timePerQuestion * 1000,
+      had_interference: question.interference || false,
+      answered_at: new Date().toISOString()
     };
 
     const newResponses = [...responses, response];
@@ -110,13 +216,25 @@ const StroopTestStandard = () => {
     
     try {
       // Transform data to match backend's expected format
+      // Backend may expect simplified format, but we send full data
       const raw_data = finalResponses.map(r => ({
-        word: r.word,
-        color: r.color,
-        user_response: r.userAnswer,
-        is_correct: r.isCorrect,
-        is_interference: r.hadInterference,
-        time_taken: r.responseTime / 1000
+        word: r.word_shown,
+        color: r.font_color,
+        user_response: r.user_answer,
+        is_correct: r.is_correct,
+        is_interference: r.had_interference,
+        time_taken: r.response_time_ms / 1000,
+        // Include all new fields for backend processing
+        question_id: r.question_id,
+        task: r.task,
+        option_1_text: r.option_1_text,
+        option_1_color: r.option_1_color,
+        option_2_text: r.option_2_text,
+        option_2_color: r.option_2_color,
+        correct_answer: r.correct_answer,
+        interference_level: r.interference_level,
+        max_allowed_time_ms: r.max_allowed_time_ms,
+        answered_at: r.answered_at
       }));
       
       // Submit to backend for scoring
@@ -209,8 +327,12 @@ const StroopTestStandard = () => {
                 
                 <div className="py-12">
                   <div 
-                    className="text-6xl font-bold"
-                    style={{ color: COLOR_MAP[question.color.toLowerCase()] || question.color }}
+                    className="text-7xl font-bold drop-shadow-md"
+                    style={{ 
+                      color: COLOR_MAP[question.fontColor.toLowerCase()] || question.fontColor,
+                      textShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                      letterSpacing: '2px'
+                    }}
                   >
                     {question.word}
                   </div>
@@ -218,17 +340,49 @@ const StroopTestStandard = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {question.options.map((option) => (
-                  <Button
-                    key={option}
-                    onClick={() => handleAnswer(option)}
-                    variant="outline"
-                    size="lg"
-                    className="h-16 text-lg capitalize"
-                  >
-                    {option}
-                  </Button>
-                ))}
+                {question.options.map((option, index) => {
+                  const optionColor = COLOR_MAP[option.color.toLowerCase()] || option.color;
+                  // Convert hex to rgba for shadow with safety check
+                  const hexToRgba = (hex: string, alpha: number): string => {
+                    if (!hex || !hex.startsWith('#')) {
+                      return `rgba(0, 0, 0, ${alpha})`;
+                    }
+                    try {
+                      const r = parseInt(hex.slice(1, 3), 16);
+                      const g = parseInt(hex.slice(3, 5), 16);
+                      const b = parseInt(hex.slice(5, 7), 16);
+                      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                    } catch {
+                      return `rgba(0, 0, 0, ${alpha})`;
+                    }
+                  };
+                  const colorRgba = hexToRgba(optionColor, 0.15);
+                  
+                  return (
+                    <Button
+                      key={`${option.text}-${option.color}-${index}`}
+                      onClick={() => handleAnswer(option.text, option.color)}
+                      variant="outline"
+                      size="lg"
+                      className="h-28 text-2xl font-bold capitalize hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-200 bg-white dark:bg-gray-900 border-2 min-w-0"
+                      style={{ 
+                        color: optionColor,
+                        borderColor: optionColor,
+                        boxShadow: `0 4px 16px rgba(0, 0, 0, 0.1), inset 0 0 0 1px ${colorRgba}`
+                      }}
+                    >
+                      <span 
+                        className="block font-extrabold select-none"
+                        style={{ 
+                          letterSpacing: '2px',
+                          filter: 'drop-shadow(0 1px 1px rgba(0, 0, 0, 0.1))'
+                        }}
+                      >
+                        {option.text.toUpperCase()}
+                      </span>
+                    </Button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

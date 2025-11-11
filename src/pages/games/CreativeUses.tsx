@@ -9,40 +9,97 @@ type AuthUser = { id: string };
 const useAuth = (): { user: AuthUser | null } => {
     return { user: { id: DEFAULT_USER_ID } }; // Uses user ID from .env
 };
-import { submitAIGame } from '../../lib/api';
+import { submitAIGame, getGameContent } from '../../lib/api';
 import { ScoreDisplay } from '@/components/ScoreDisplay';
 import { GameResult } from '@/lib/types';
 import { Timer } from '@/components/game/Timer'; // Import Timer component
 
 const GAME_TYPE = 'creative_uses';
-const GAME_DURATION = 60; // seconds
+const DEFAULT_GAME_DURATION = 60; // seconds
 
-// Hardcoded objects - one after the other
-const OBJECTS = ['paperclip', 'brick', 'bottle'];
+// Fallback objects for Creative Uses game
+const FALLBACK_OBJECTS = [
+    'A Paperclip',
+    'A Bottle',
+    'A Pencil',
+    'A Brick'
+];
+
+// Get a random fallback object
+const getRandomFallbackObject = (): string => {
+    return FALLBACK_OBJECTS[Math.floor(Math.random() * FALLBACK_OBJECTS.length)];
+};
 
 const CreativeUsesGame = () => {
     const { user } = useAuth();
-    const [currentObjectIndex, setCurrentObjectIndex] = useState(0);
-    const [object, setObject] = useState(OBJECTS[0]);
+    const [object, setObject] = useState<string>('');
+    const [gameDuration, setGameDuration] = useState(DEFAULT_GAME_DURATION);
+    const [contentId, setContentId] = useState<string | null>(null); // Track which content was used
     const [uses, setUses] = useState<string[]>([]);
     const [currentUse, setCurrentUse] = useState('');
-    const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
+    const [timeLeft, setTimeLeft] = useState(DEFAULT_GAME_DURATION);
     const [isFinished, setIsFinished] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // Start with loading true
     const [submitting, setSubmitting] = useState(false);
     const [score, setScore] = useState<GameResult | null>(null);
     const [gameStartTime, setGameStartTime] = useState<number>(0); // Track actual start time
     const [isTimerRunning, setIsTimerRunning] = useState(false); // Control timer
     const [gameStarted, setGameStarted] = useState(false); // Track if game has started
-    const [allResponses, setAllResponses] = useState<any[]>([]); // Store all object responses
+
+    // Fetch object from database on component mount
+    useEffect(() => {
+        const fetchObject = async () => {
+            try {
+                setLoading(true);
+                const contentData = await getGameContent(GAME_TYPE);
+                console.log('Fetched creative uses content from database:', contentData);
+                
+                // Extract object name from content data
+                const objectName = contentData?.object || 
+                                   contentData?.object_name || 
+                                   null;
+                
+                if (objectName) {
+                    setObject(objectName);
+                } else {
+                    // If backend doesn't provide object, use random fallback
+                    console.warn('Backend did not provide object, using random fallback');
+                    const fallbackObject = getRandomFallbackObject();
+                    setObject(fallbackObject);
+                    setContentId('fallback-creative-' + fallbackObject.toLowerCase().replace(/\s+/g, '-'));
+                }
+                
+                // Extract time limit if provided
+                if (contentData?.time_limit) {
+                    setGameDuration(contentData.time_limit);
+                    setTimeLeft(contentData.time_limit);
+                }
+                
+                // Store content_id for submission
+                if (contentData?.content_id) {
+                    setContentId(contentData.content_id);
+                }
+            } catch (error: any) {
+                console.error('Failed to load object from database:', error);
+                console.warn('Using fallback object');
+                // Use random fallback object if backend fails
+                const fallbackObject = getRandomFallbackObject();
+                setObject(fallbackObject);
+                setContentId('fallback-creative-' + fallbackObject.toLowerCase().replace(/\s+/g, '-'));
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchObject();
+    }, []);
 
     const startGame = () => {
+        if (!object) return; // Don't start if object not loaded
         setGameStarted(true);
-        setCurrentObjectIndex(0);
-        setObject(OBJECTS[0]);
         setUses([]);
         setCurrentUse('');
-        setAllResponses([]);
+        setTimeLeft(gameDuration);
         setGameStartTime(Date.now()); // Record actual start time
         setIsTimerRunning(true); // Start timer
     };
@@ -56,43 +113,38 @@ const CreativeUsesGame = () => {
                 // Calculate actual time taken from start time
                 const actualTimeTaken = (Date.now() - gameStartTime) / 1000;
                 
-                // Format data according to backend documentation for a single submission
+                // Format data according to backend documentation
                 const responseData = {
                     object_name: object,
                     uses: uses,
                     time_taken: actualTimeTaken, // Use actual time taken
-                    time_limit: GAME_DURATION
+                    time_limit: gameDuration
                 };
                 
-                // Store this response
-                const newResponses = [...allResponses, responseData];
-                setAllResponses(newResponses);
+                console.log('Submitting creative uses game with data:', { gameType: GAME_TYPE, responseData, contentId });
+                // Submit with content_id to track which object was used
+                const result = await submitAIGame(
+                    GAME_TYPE, 
+                    responseData, 
+                    user.id,
+                    contentId || undefined
+                );
                 
-                // If there are more objects, move to next one
-                if (currentObjectIndex < OBJECTS.length - 1) {
-                    const nextIndex = currentObjectIndex + 1;
-                    setCurrentObjectIndex(nextIndex);
-                    setObject(OBJECTS[nextIndex]);
-                    setUses([]);
-                    setCurrentUse('');
-                    setGameStartTime(Date.now()); // Reset timer for next object
-                    setIsTimerRunning(true); // Restart timer
-                    setSubmitting(false);
+                console.log('Creative uses game result from backend:', result);
+                
+                // Backend returns { session_id, version_used, ai_scores, final_scores } for AI games
+                if (result && (result.final_scores || result.scores || result.session_id)) {
+                    setScore(result);
+                    setIsFinished(true);
                 } else {
-                    // All objects completed, submit the last one and finish
-                    const result = await submitAIGame(GAME_TYPE, responseData, user.id);
-                    // Backend returns { session_id, version_used, ai_scores, final_scores }
-                    if (result && (result.final_scores || result.scores)) {
-                        setScore(result);
-                        setIsFinished(true);
-                    } else {
-                        console.error('Invalid result from backend:', result);
-                        alert('Failed to get scores. Please try again.');
-                    }
+                    console.error('Invalid result from backend - missing scores or session_id:', result);
+                    alert(`Failed to get scores. Backend returned: ${JSON.stringify(result)}`);
                 }
-            } catch (error) {
+            } catch (error: any) {
                 console.error("Error submitting creative uses game:", error);
-                alert("Failed to submit game. Please try again.");
+                const errorMessage = error?.message || 'Unknown error';
+                console.error('Error details:', { error, message: errorMessage, stack: error?.stack });
+                alert(`Failed to submit game: ${errorMessage}. Check console for details.`);
             } finally {
                 setSubmitting(false);
             }
@@ -106,41 +158,41 @@ const CreativeUsesGame = () => {
             setSubmitting(true);
             try {
                 // When timeout occurs, use the full duration
+                const actualTimeTaken = gameStartTime > 0 
+                    ? (Date.now() - gameStartTime) / 1000 
+                    : gameDuration;
+                
                 const responseData = {
                     object_name: object,
                     uses: uses,
-                    time_taken: GAME_DURATION, // Full duration on timeout
-                    time_limit: GAME_DURATION
+                    time_taken: actualTimeTaken,
+                    time_limit: gameDuration
                 };
                 
-                // Store this response
-                const newResponses = [...allResponses, responseData];
-                setAllResponses(newResponses);
+                console.log('Submitting creative uses game (timeout) with data:', { gameType: GAME_TYPE, responseData, contentId });
+                // Submit with content_id to track which object was used
+                const result = await submitAIGame(
+                    GAME_TYPE, 
+                    responseData, 
+                    user.id,
+                    contentId || undefined
+                );
                 
-                // If there are more objects, move to next one
-                if (currentObjectIndex < OBJECTS.length - 1) {
-                    const nextIndex = currentObjectIndex + 1;
-                    setCurrentObjectIndex(nextIndex);
-                    setObject(OBJECTS[nextIndex]);
-                    setUses([]);
-                    setCurrentUse('');
-                    setGameStartTime(Date.now()); // Reset timer for next object
-                    setIsTimerRunning(true); // Restart timer
-                    setSubmitting(false);
+                console.log('Creative uses game result from backend (timeout):', result);
+                
+                // Backend returns { session_id, version_used, ai_scores, final_scores } for AI games
+                if (result && (result.final_scores || result.scores || result.session_id)) {
+                    setScore(result);
+                    setIsFinished(true);
                 } else {
-                    // All objects completed, submit the last one and finish
-                    const result = await submitAIGame(GAME_TYPE, responseData, user.id);
-                    if (result && (result.final_scores || result.scores)) {
-                        setScore(result);
-                        setIsFinished(true);
-                    } else {
-                        console.error('Invalid result from backend:', result);
-                        alert('Failed to get scores. Please try again.');
-                    }
+                    console.error('Invalid result from backend - missing scores or session_id:', result);
+                    alert(`Failed to get scores. Backend returned: ${JSON.stringify(result)}`);
                 }
-            } catch (error) {
-                console.error("Error submitting creative uses game:", error);
-                alert("Failed to submit game. Please try again.");
+            } catch (error: any) {
+                console.error("Error submitting creative uses game (timeout):", error);
+                const errorMessage = error?.message || 'Unknown error';
+                console.error('Error details:', { error, message: errorMessage, stack: error?.stack });
+                alert(`Failed to submit game: ${errorMessage}. Check console for details.`);
             } finally {
                 setSubmitting(false);
             }
@@ -153,6 +205,15 @@ const CreativeUsesGame = () => {
             setCurrentUse('');
         }
     };
+
+    if (loading) {
+        return (
+            <div className="flex flex-col justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                <p className="text-muted-foreground">Loading object from backend...</p>
+            </div>
+        );
+    }
 
     if (isFinished && score) {
         return <ScoreDisplay result={score} gameType={GAME_TYPE} />;
@@ -185,9 +246,9 @@ const CreativeUsesGame = () => {
                             <div className="bg-muted p-4 rounded-lg">
                                 <h4 className="font-semibold mb-2">Game Details:</h4>
                                 <ul className="space-y-1 text-sm">
-                                    <li>• {OBJECTS.length} objects to complete</li>
-                                    <li>• {GAME_DURATION} seconds per object</li>
+                                    <li>• {gameDuration} seconds to complete</li>
                                     <li>• Be creative and think outside the box!</li>
+                                    {object && <li>• Object: <strong>{object}</strong></li>}
                                 </ul>
                             </div>
                             <Button onClick={startGame} className="w-full" size="lg">
@@ -209,15 +270,15 @@ const CreativeUsesGame = () => {
                         <CardTitle>Creative Uses Challenge</CardTitle>
                         <Timer
                             isRunning={isTimerRunning}
-                            initialTime={GAME_DURATION}
+                            initialTime={gameDuration}
                             countDown
-                            maxTime={GAME_DURATION}
+                            maxTime={gameDuration}
                             onComplete={handleTimeout}
                             onTick={(time) => setTimeLeft(time)} // Update timeLeft as timer counts down
                         />
                     </div>
                     <CardDescription>
-                        Object {currentObjectIndex + 1} of {OBJECTS.length} • Time Left: {timeLeft}s
+                        Time Left: {Math.max(0, timeLeft)}s
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -239,7 +300,7 @@ const CreativeUsesGame = () => {
                 </ul>
                 <Button onClick={handleFinish} className="w-full mt-6" disabled={submitting || isFinished}>
                     {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {currentObjectIndex < OBJECTS.length - 1 ? 'Next Object' : 'Finish'}
+                    Finish
                 </Button>
             </CardContent>
         </Card>

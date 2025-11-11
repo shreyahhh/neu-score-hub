@@ -97,24 +97,25 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
 
   const renderGameConfig = () => {
     if (loading || !editedConfig) {
-      return <div className="py-8 text-center text-muted-foreground">Loading...</div>;
+      return <div className="py-8 text-center text-foreground">Loading...</div>;
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 text-foreground">
         {/* Final Weights */}
         {editedConfig.final_weights && (
           <div className="space-y-2">
-            <h3 className="font-semibold">Final Weights</h3>
+            <h3 className="font-semibold text-foreground">Final Weights</h3>
             <div className="grid grid-cols-2 gap-3">
               {Object.entries(editedConfig.final_weights).map(([key, value]) => (
                 <div key={key}>
-                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Label className="text-xs capitalize text-foreground">{key.replace(/_/g, ' ')}</Label>
                   <Input
                     type="number"
                     step="0.01"
                     value={value as number}
                     onChange={(e) => updateFinalWeight(key, parseFloat(e.target.value) || 0)}
+                    className="text-foreground"
                   />
                 </div>
               ))}
@@ -125,19 +126,19 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
         {/* Competency Formulas */}
         {editedConfig.competency_formulas && (
           <div className="space-y-2">
-            <h3 className="font-semibold">Competency Formulas</h3>
+            <h3 className="font-semibold text-foreground">Competency Formulas</h3>
             <p className="text-xs text-muted-foreground">
               Edit the mathematical formulas used to calculate each competency score
             </p>
             <div className="space-y-3">
               {Object.entries(editedConfig.competency_formulas).map(([key, value]) => (
                 <div key={key}>
-                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Label className="text-xs capitalize text-foreground">{key.replace(/_/g, ' ')}</Label>
                   <Textarea
                     value={value as string}
                     onChange={(e) => updateFormula(key, e.target.value)}
                     rows={2}
-                    className="font-mono text-sm"
+                    className="font-mono text-sm text-foreground"
                   />
                 </div>
               ))}
@@ -148,18 +149,19 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
         {/* AI Prompts */}
         {editedConfig.ai_prompts && (
           <div className="space-y-2">
-            <h3 className="font-semibold">AI Prompts</h3>
+            <h3 className="font-semibold text-foreground">AI Prompts</h3>
             <p className="text-xs text-muted-foreground">
               Configure the prompts used for AI-based scoring
             </p>
             <div className="space-y-3">
               {Object.entries(editedConfig.ai_prompts).map(([key, value]) => (
                 <div key={key}>
-                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Label className="text-xs capitalize text-foreground">{key.replace(/_/g, ' ')}</Label>
                   <Textarea
                     value={value as string}
                     onChange={(e) => updateAIPrompt(key, e.target.value)}
                     rows={4}
+                    className="text-foreground"
                   />
                 </div>
               ))}
@@ -170,11 +172,11 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
         {/* Settings */}
         {editedConfig.settings && (
           <div className="space-y-2">
-            <h3 className="font-semibold">Settings</h3>
+            <h3 className="font-semibold text-foreground">Settings</h3>
             <div className="space-y-2">
               {Object.entries(editedConfig.settings).map(([key, value]) => (
                 <div key={key} className="grid grid-cols-2 gap-2 items-center">
-                  <Label className="text-xs capitalize">{key.replace(/_/g, ' ')}</Label>
+                  <Label className="text-xs capitalize text-foreground">{key.replace(/_/g, ' ')}</Label>
                   <Input
                     type={typeof value === 'number' ? 'number' : 'text'}
                     value={value as any}
@@ -185,6 +187,7 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
                         [key]: typeof value === 'number' ? parseFloat(e.target.value) : e.target.value,
                       },
                     }))}
+                    className="text-foreground"
                   />
                 </div>
               ))}
@@ -195,9 +198,9 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
         {/* Variables Reference */}
         {editedConfig.variables && (
           <div className="space-y-2">
-            <h3 className="font-semibold">Available Variables</h3>
+            <h3 className="font-semibold text-foreground">Available Variables</h3>
             <div className="bg-muted p-3 rounded-md">
-              <p className="text-xs font-mono">
+              <p className="text-xs font-mono text-foreground">
                 {editedConfig.variables.join(', ')}
               </p>
             </div>
@@ -209,34 +212,34 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] text-foreground">
         <DialogHeader>
-          <DialogTitle>Scoring Controls</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-foreground">Scoring Controls</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
             Modify scoring formulas, weights, and AI prompts. Changes will create a new version.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as GameType)} className="w-full">
-          <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto">
-            <TabsTrigger value="mental_math_sprint">Mental Math</TabsTrigger>
-            <TabsTrigger value="stroop_test">Stroop Test</TabsTrigger>
-            <TabsTrigger value="sign_sudoku">Sign Sudoku</TabsTrigger>
-            <TabsTrigger value="face_name_match">Face-Name</TabsTrigger>
-            <TabsTrigger value="card_flip_challenge">Card Flip</TabsTrigger>
-            <TabsTrigger value="scenario_challenge">Scenario</TabsTrigger>
-            <TabsTrigger value="ai_debate">Debate</TabsTrigger>
-            <TabsTrigger value="creative_uses">Creative Uses</TabsTrigger>
+          <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto bg-muted">
+            <TabsTrigger value="mental_math_sprint" className="text-foreground data-[state=inactive]:text-muted-foreground">Mental Math</TabsTrigger>
+            <TabsTrigger value="stroop_test" className="text-foreground data-[state=inactive]:text-muted-foreground">Stroop Test</TabsTrigger>
+            <TabsTrigger value="sign_sudoku" className="text-foreground data-[state=inactive]:text-muted-foreground">Sign Sudoku</TabsTrigger>
+            <TabsTrigger value="face_name_match" className="text-foreground data-[state=inactive]:text-muted-foreground">Face-Name</TabsTrigger>
+            <TabsTrigger value="card_flip_challenge" className="text-foreground data-[state=inactive]:text-muted-foreground">Card Flip</TabsTrigger>
+            <TabsTrigger value="scenario_challenge" className="text-foreground data-[state=inactive]:text-muted-foreground">Scenario</TabsTrigger>
+            <TabsTrigger value="ai_debate" className="text-foreground data-[state=inactive]:text-muted-foreground">Debate</TabsTrigger>
+            <TabsTrigger value="creative_uses" className="text-foreground data-[state=inactive]:text-muted-foreground">Creative Uses</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[50vh] mt-4">
-            <TabsContent value={activeTab}>
+            <TabsContent value={activeTab} className="text-foreground">
               {renderGameConfig()}
             </TabsContent>
           </ScrollArea>
         </Tabs>
 
-        <div className="flex gap-3 justify-end pt-4 border-t">
+        <div className="flex gap-3 justify-end pt-4 border-t border-border">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

@@ -1,8 +1,8 @@
 // Central API Client for NeuRazor Backend
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
-// User ID from environment variable or fallback to default
-export const DEFAULT_USER_ID = import.meta.env.VITE_USER_ID || '53f77b43-d71a-4edf-8b80-c70b975264d8';
+// Default test user ID (from backend documentation)
+export const DEFAULT_USER_ID = '53f77b43-d71a-4edf-8b80-c70b975264d8';
 
 /**
  * Submit game result for action-based games
@@ -38,32 +38,85 @@ export async function submitGame(gameType: string, rawData: any, userId?: string
 
 /**
  * Submit AI-based game result (text games)
+ * @param gameType - The game type identifier
+ * @param responseData - The response data (should include content_id if available)
+ * @param userId - Optional user ID
+ * @param contentId - Optional content ID (which question/scenario was used)
  */
-export async function submitAIGame(gameType: string, responseData: any, userId?: string) {
+export async function submitAIGame(gameType: string, responseData: any, userId?: string, contentId?: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/submit-game`, {
+    const requestBody: any = {
+      game_type: gameType,
+      response_data: responseData,
+      user_id: userId || DEFAULT_USER_ID
+    };
+
+    // Include content_id if provided (for tracking which question was used)
+    if (contentId) {
+      requestBody.content_id = contentId;
+    }
+
+    const url = `${API_BASE_URL}/api/ai/submit-game`;
+    console.log(`[submitAIGame] Sending request to: ${url}`);
+    console.log(`[submitAIGame] Request body:`, JSON.stringify(requestBody, null, 2));
+    console.log(`[submitAIGame] API_BASE_URL:`, API_BASE_URL);
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        game_type: gameType,
-        response_data: responseData,
-        user_id: userId || DEFAULT_USER_ID
-      })
+      body: JSON.stringify(requestBody)
     });
 
+    console.log(`[submitAIGame] Response status: ${response.status} ${response.statusText}`);
+    console.log(`[submitAIGame] Response headers:`, Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('API Error:', errorData);
-      throw new Error(errorData.error || `Failed to submit AI game: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[submitAIGame] Error response body:`, errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || 'Unknown error' };
+      }
+      
+      console.error('[submitAIGame] API Error:', errorData);
+      throw new Error(errorData.error || errorData.message || `Failed to submit AI game: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.error || 'Backend returned an error');
+    const responseText = await response.text();
+    console.log(`[submitAIGame] Response body:`, responseText);
+    
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      console.error('[submitAIGame] Failed to parse response as JSON:', e);
+      throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 100)}`);
     }
+
+    console.log(`[submitAIGame] Parsed result:`, result);
+
+    if (!result.success) {
+      console.error('[submitAIGame] Backend returned success: false', result);
+      throw new Error(result.error || result.message || 'Backend returned an error');
+    }
+
+    if (!result.data) {
+      console.warn('[submitAIGame] Backend returned success: true but no data field', result);
+    }
+
+    console.log(`[submitAIGame] Returning data:`, result.data);
     return result.data;
-  } catch (error) {
-    console.error('Error submitting AI game:', error);
+  } catch (error: any) {
+    console.error('[submitAIGame] Error submitting AI game:', error);
+    console.error('[submitAIGame] Error stack:', error?.stack);
+    console.error('[submitAIGame] Error details:', {
+      message: error?.message,
+      name: error?.name,
+      cause: error?.cause
+    });
     throw error;
   }
 }
@@ -193,95 +246,128 @@ export async function getResultsHistory(gameType: string, userId?: string) {
       ? `${API_BASE_URL}/api/games/results/${gameType}?userId=${userId}`
       : `${API_BASE_URL}/api/games/results/${gameType}`;
     
+    console.log(`[getResultsHistory] Fetching results from: ${url}`);
+    console.log(`[getResultsHistory] Game type: ${gameType}, User ID: ${userId || 'none'}`);
+    
     const response = await fetch(url, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     });
 
+    console.log(`[getResultsHistory] Response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('API Error:', errorData);
-      throw new Error(errorData.error || `Failed to load results: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[getResultsHistory] Error response body:`, errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText || 'Unknown error' };
+      }
+      
+      console.error('[getResultsHistory] API Error:', errorData);
+      throw new Error(errorData.error || errorData.message || `Failed to load results: ${response.status} ${response.statusText}`);
     }
 
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.error || 'Backend returned an error');
+    const responseText = await response.text();
+    console.log(`[getResultsHistory] Response body:`, responseText);
+    
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      console.error('[getResultsHistory] Failed to parse response as JSON:', e);
+      throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 100)}`);
     }
-    return result.data;
-  } catch (error) {
-    console.error('Error loading results:', error);
+
+    console.log(`[getResultsHistory] Parsed result:`, result);
+
+    if (!result.success) {
+      console.error('[getResultsHistory] Backend returned success: false', result);
+      throw new Error(result.error || result.message || 'Backend returned an error');
+    }
+
+    console.log(`[getResultsHistory] Returning data for ${gameType}:`, result.data);
+    console.log(`[getResultsHistory] Number of sessions: ${Array.isArray(result.data) ? result.data.length : 'not an array'}`);
+    
+    return result.data || [];
+  } catch (error: any) {
+    console.error('[getResultsHistory] Error loading results:', error);
+    console.error('[getResultsHistory] Error details:', {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack,
+      gameType,
+      userId
+    });
     throw error;
   }
 }
 
-export async function getGameContent(gameType: string) {
-  console.warn(`Backend endpoint /api/games/content/${gameType} is not documented. Returning mock data.`);
-  // NOTE: This is mock data. A backend endpoint should exist to provide game content.
-  if (gameType === 'scenario_challenge') {
-    return {
-      id: 'scenario-1',
-      title: 'Office Conflict',
-      description: 'You overhear a disagreement between two colleagues, Alex and Ben, about a project deadline. Alex is visibly stressed, while Ben seems dismissive.',
-      questions: [
-        { id: 1, text: 'What are the potential underlying reasons for Alexs and Bens behavior?' },
-        { id: 2, text: 'How would you approach Alex to understand their perspective?' },
-        { id: 3, text: 'How would you approach Ben to mediate the situation?' },
-        { id: 4, text: 'What steps would you take to resolve the conflict and ensure the project stays on track?' },
-      ],
-    };
-  } else if (gameType === 'creative_uses') {
-    return {
-      object_name: 'Brick',
-    };
-  } else if (gameType === 'interview') {
-    return [
-      { id: 1, text: 'Tell me about a time you failed and what you learned from it.', competency: 'Resilience' },
-      { id: 2, text: 'Describe a situation where you had to motivate a team. What was the outcome?', competency: 'Leadership' },
-      { id: 3, text: 'How do you handle constructive criticism?', competency: 'Growth Mindset' },
-      { id: 4, text: 'Walk me through a complex problem you solved. What was your process?', competency: 'Problem-Solving' },
-    ];
-  } else if (gameType === 'statement_reasoning') {
-    return [
-      {
-        id: 1,
-        statements: [
-          'All successful entrepreneurs take calculated risks.',
-          'Sarah started her business with minimal capital.',
-          'Sarah\'s business is now profitable after two years.'
-        ],
-        question: 'What logical connection can you identify between these statements?'
-      },
-      {
-        id: 2,
-        statements: [
-          'Regular exercise improves cardiovascular health.',
-          'People who exercise regularly have lower stress levels.',
-          'Studies show exercise releases endorphins that improve mood.'
-        ],
-        question: 'How do these statements relate to each other? Explain the underlying pattern.'
-      },
-      {
-        id: 3,
-        statements: [
-          'The company implemented flexible work hours.',
-          'Employee satisfaction scores increased by 30%.',
-          'Productivity metrics showed a 15% improvement.'
-        ],
-        question: 'What reasoning connects these three statements?'
-      },
-      {
-        id: 4,
-        statements: [
-          'Reading enhances vocabulary and comprehension.',
-          'Students who read regularly perform better on standardized tests.',
-          'Reading develops critical thinking and analytical skills.'
-        ],
-        question: 'Analyze the relationship between these statements. What is the core connection?'
-      }
-    ];
+/**
+ * Get game content from database (scenarios, questions, topics)
+ * Fetches from game_content table via /api/content/:game_type endpoint
+ * Returns random content with content_id for tracking
+ */
+export async function getGameContent(gameType: string, difficulty?: string) {
+  try {
+    // Build URL with optional difficulty parameter
+    let url = `${API_BASE_URL}/api/content/${gameType}`;
+    if (difficulty) {
+      url += `?difficulty=${difficulty}`;
+    }
+
+    console.log(`[getGameContent] Fetching content from: ${url}`);
+    console.log(`[getGameContent] API_BASE_URL:`, API_BASE_URL);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    console.log(`[getGameContent] Response status: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[getGameContent] Error response body:`, errorText);
+      console.error(`[getGameContent] API Error: Status ${response.status}`);
+      throw new Error(`Failed to fetch game content: ${response.status} ${response.statusText}`);
+    }
+
+    const responseText = await response.text();
+    console.log(`[getGameContent] Response body:`, responseText);
+    
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      console.error('[getGameContent] Failed to parse response as JSON:', e);
+      throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 100)}`);
+    }
+    
+    console.log(`[getGameContent] Parsed result:`, result);
+
+    if (!result.success) {
+      console.error('[getGameContent] Backend returned success: false', result);
+      throw new Error(result.error || result.message || 'Backend returned an error');
+    }
+
+    console.log(`[getGameContent] Returning data:`, result.data);
+    // Return the data with content_id
+    return result.data;
+  } catch (error: any) {
+    console.error(`[getGameContent] Error fetching game content for ${gameType}:`, error);
+    console.error(`[getGameContent] Error details:`, {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack
+    });
+    // Don't return fallback - throw error so games know backend fetch failed
+    // Games should handle the error and show appropriate message to user
+    throw error;
   }
-  throw new Error(`Mock data for gameType: ${gameType} not found.`);
 }
 
 /**

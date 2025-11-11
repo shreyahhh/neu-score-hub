@@ -19,13 +19,21 @@ const GAME_TYPE = 'scenario_challenge';
 const TIME_PER_QUESTION = 120; // 2 minutes per question
 
 interface Scenario {
-    id: string | number;
-    title: string;
-    description: string;
+    content_id?: string; // ID from database
+    game_type?: string;
+    scenario: string; // Scenario text
     questions: {
-        id: string | number;
-        text: string;
+        id: string;
+        question: string;
+        time_limit?: number;
     }[];
+}
+
+interface ResponseData {
+    question_id: string;
+    question_text: string;
+    response_text: string;
+    time_taken: number;
 }
 
 const ScenarioChallenge = () => {
@@ -40,16 +48,73 @@ const ScenarioChallenge = () => {
     const [questionStartTime, setQuestionStartTime] = useState<number>(0); // Track start time for each question
     const [isTimerRunning, setIsTimerRunning] = useState(false); // Control timer
     const [gameStarted, setGameStarted] = useState(false); // Track if game has started
+    const [allResponses, setAllResponses] = useState<ResponseData[]>([]); // Store all responses for final submission
+    const [contentId, setContentId] = useState<string | null>(null); // Track which content was used
 
     useEffect(() => {
         const fetchScenario = async () => {
             try {
                 setLoading(true);
-                // Assuming getGameContent returns the full scenario object with questions
-                const fetchedScenario = await getGameContent(GAME_TYPE) as Scenario;
-                setScenario(fetchedScenario);
-            } catch (error) {
-                console.error("Failed to load scenario:", error);
+                // Fetch random scenario from database via /api/content/scenario_challenge
+                const contentData = await getGameContent(GAME_TYPE);
+                console.log('Fetched content from database:', contentData);
+                
+                // Validate and transform data structure
+                if (!contentData || !contentData.scenario || !contentData.questions || contentData.questions.length === 0) {
+                    throw new Error('Invalid scenario data from database');
+                }
+                
+                // Store content_id for submission
+                if (contentData.content_id) {
+                    setContentId(contentData.content_id);
+                }
+                
+                // Transform to match component's expected format
+                const transformedScenario: Scenario = {
+                    content_id: contentData.content_id,
+                    game_type: contentData.game_type || GAME_TYPE,
+                    scenario: contentData.scenario,
+                    questions: contentData.questions.map((q: any) => ({
+                        id: q.id || `q${Math.random()}`,
+                        question: q.question || q.text || q,
+                        time_limit: q.time_limit || TIME_PER_QUESTION
+                    }))
+                };
+                
+                setScenario(transformedScenario);
+            } catch (error: any) {
+                console.error("Failed to load scenario from database:", error);
+                console.warn("Using fallback scenario data");
+                // Fallback scenario data
+                const fallbackScenario: Scenario = {
+                    content_id: 'fallback-scenario-1',
+                    game_type: GAME_TYPE,
+                    scenario: "During Monday's team meeting, Raj interrupted Asha twice while she was making a presentation. Both times, he spoke over her while she was explaining a point on the slide.",
+                    questions: [
+                        {
+                            id: 'q1',
+                            question: 'What could be Raj\'s reasons for interrupting Asha? Share at least 3 distinct possibilities.',
+                            time_limit: TIME_PER_QUESTION
+                        },
+                        {
+                            id: 'q2',
+                            question: 'What might Asha be feeling right now? Share at least 3 possibilities.',
+                            time_limit: TIME_PER_QUESTION
+                        },
+                        {
+                            id: 'q3',
+                            question: 'Asha appeared happy that Raj interrupted her and explained the points. Share at least 3 possibilities as to why she might feel that way.',
+                            time_limit: TIME_PER_QUESTION
+                        },
+                        {
+                            id: 'q4',
+                            question: '5 minutes later, Asha requested Raj to continue the presentation. What explains it? Share at least 3 possibilities.',
+                            time_limit: TIME_PER_QUESTION
+                        }
+                    ]
+                };
+                setScenario(fallbackScenario);
+                setContentId('fallback-scenario-1');
             } finally {
                 setLoading(false);
             }
@@ -59,6 +124,9 @@ const ScenarioChallenge = () => {
 
     const startGame = () => {
         setGameStarted(true);
+        setAllResponses([]); // Reset responses
+        setCurrentQuestionIndex(0);
+        setCurrentAnswer('');
         setQuestionStartTime(Date.now()); // Start timer for the first question
         setIsTimerRunning(true); // Start timer
     };
@@ -71,16 +139,16 @@ const ScenarioChallenge = () => {
             const question = scenario.questions[currentQuestionIndex];
             const timeTaken = (Date.now() - questionStartTime) / 1000; // Calculate time taken
 
-            const responseData = {
-                scenario_text: scenario.description,
-                question_text: question.text,
+            const responseData: ResponseData = {
+                question_id: question.id,
+                question_text: question.question,
                 response_text: currentAnswer,
-                response_length: currentAnswer.length,
-                time_taken: timeTaken, // Include time_taken
+                time_taken: timeTaken
             };
 
-            // Submit each answer individually and get a score
-            const result = await submitAIGame(GAME_TYPE, responseData, user.id);
+            // Store response for final submission
+            const updatedResponses = [...allResponses, responseData];
+            setAllResponses(updatedResponses);
 
             // Move to the next question or finish the game
             if (currentQuestionIndex < scenario.questions.length - 1) {
@@ -92,14 +160,59 @@ const ScenarioChallenge = () => {
                     setQuestionStartTime(Date.now()); // Reset timer for next question
                     setIsTimerRunning(true); // Restart timer
                 }, 100);
+                setSubmitting(false);
             } else {
-                setFinalScore(result); // Set the final score from the last submission
-                setIsFinished(true);
-                setIsTimerRunning(false); // Stop timer when game finishes
+                // Last question - submit all responses together
+                setIsTimerRunning(false);
+                await submitAllResponses(updatedResponses);
             }
         } catch (error) {
             console.error("Error submitting scenario response:", error);
             alert("Failed to submit response. Please try again.");
+            setSubmitting(false);
+        }
+    };
+
+    // Submit all responses at once to create a single session
+    const submitAllResponses = async (responses: ResponseData[]) => {
+        try {
+            setSubmitting(true);
+            
+            // Prepare response data in the format backend expects
+            // Backend expects: { responses: [...] }
+            const responseData = {
+                responses: responses.map(r => ({
+                    question_id: r.question_id,
+                    question_text: r.question_text,
+                    response_text: r.response_text,
+                    time_taken: r.time_taken
+                }))
+            };
+            
+            console.log('Submitting scenario challenge with data:', { gameType: GAME_TYPE, responseData, contentId });
+            // Submit with content_id to track which scenario was used
+            const result = await submitAIGame(
+                GAME_TYPE, 
+                responseData, 
+                user?.id,
+                contentId || undefined
+            );
+
+            console.log('Scenario challenge result from backend:', result);
+
+            // Backend returns { session_id, version_used, ai_scores, final_scores } for AI games
+            if (result && (result.final_scores || result.scores || result.session_id)) {
+                setFinalScore(result);
+                setIsFinished(true);
+            } else {
+                console.error('Invalid result from backend - missing scores or session_id:', result);
+                throw new Error(`Invalid response from backend. Expected scores or session_id, got: ${JSON.stringify(result)}`);
+            }
+        } catch (error: any) {
+            console.error("Error submitting all responses:", error);
+            const errorMessage = error?.message || 'Unknown error';
+            console.error('Error details:', { error, message: errorMessage, stack: error?.stack });
+            alert(`Failed to submit game: ${errorMessage}. Check console for details.`);
         } finally {
             setSubmitting(false);
         }
@@ -111,35 +224,41 @@ const ScenarioChallenge = () => {
         setSubmitting(true);
         try {
             const question = scenario.questions[currentQuestionIndex];
-            const responseData = {
-                scenario_text: scenario.description,
-                question_text: question.text,
+            const responseData: ResponseData = {
+                question_id: question.id,
+                question_text: question.question,
                 response_text: '', // Empty response for timeout
-                response_length: 0,
-                time_taken: TIME_PER_QUESTION, // Max time taken for timeout
+                time_taken: TIME_PER_QUESTION // Max time taken for timeout
             };
 
-            const result = await submitAIGame(GAME_TYPE, responseData, user.id);
+            // Store timeout response
+            const updatedResponses = [...allResponses, responseData];
+            setAllResponses(updatedResponses);
 
             if (currentQuestionIndex < scenario.questions.length - 1) {
                 setCurrentQuestionIndex(currentQuestionIndex + 1);
                 setCurrentAnswer('');
                 setQuestionStartTime(Date.now()); // Reset timer for next question
                 setIsTimerRunning(true); // Restart timer
+                setSubmitting(false);
             } else {
-                setFinalScore(result);
-                setIsFinished(true);
+                // Last question timed out - submit all responses
                 setIsTimerRunning(false);
+                await submitAllResponses(updatedResponses);
             }
         } catch (error) {
             console.error("Error handling timeout:", error);
-        } finally {
             setSubmitting(false);
         }
     };
 
     if (loading) {
-        return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+        return (
+            <div className="flex flex-col justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                <p className="text-muted-foreground">Loading scenario from backend...</p>
+            </div>
+        );
     }
 
     if (isFinished && finalScore) {
@@ -157,14 +276,14 @@ const ScenarioChallenge = () => {
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-2xl">
-                                {scenario.title}
+                                Scenario Challenge
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div>
                                 <h3 className="text-lg font-semibold mb-2">Scenario</h3>
                                 <p className="text-muted-foreground mb-4">
-                                    {scenario.description}
+                                    {scenario.scenario}
                                 </p>
                             </div>
                             <div className="bg-muted p-4 rounded-lg">
@@ -193,7 +312,7 @@ const ScenarioChallenge = () => {
         <Card className="max-w-3xl w-full">
             <CardHeader>
                 <div className="flex justify-between items-center">
-                    <CardTitle>{scenario.title}</CardTitle>
+                    <CardTitle>Scenario Challenge</CardTitle>
                     <Timer
                         key={currentQuestionIndex} // Key to force re-render and reset timer
                         isRunning={isTimerRunning}
@@ -203,11 +322,11 @@ const ScenarioChallenge = () => {
                         onComplete={handleTimeout}
                     />
                 </div>
-                <CardDescription>{scenario.description}</CardDescription>
+                <CardDescription>{scenario.scenario}</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
-                    <p className="font-semibold">{currentQuestion.text}</p>
+                    <p className="font-semibold">{currentQuestion.question}</p>
                     <p className="text-sm text-muted-foreground">
                         Question {currentQuestionIndex + 1} of {scenario.questions.length}
                     </p>
