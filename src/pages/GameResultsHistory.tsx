@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ArrowLeft, GitCompare, Download, Filter } from 'lucide-react';
-import { getResultsHistory, getAllScoringVersions } from '@/lib/api';
+import { Loader2, ArrowLeft } from 'lucide-react';
+import { getResultsHistory } from '@/lib/api';
 import { getGameDisplayName, transformGameResult } from '@/lib/transformers';
 import { GameResult } from '@/lib/types';
 
@@ -24,18 +24,14 @@ interface Session {
 
 const GameResultsHistory = () => {
   const { gameType } = useParams<{ gameType: string }>();
-  const navigate = useNavigate();
   const [sessions, setSessions] = useState<Session[]>([]);
-  const [versions, setVersions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
-  const [versionFilter, setVersionFilter] = useState<string>('all');
 
   useEffect(() => {
     if (gameType) {
       loadHistory();
-      loadVersions();
     }
   }, [gameType]);
 
@@ -59,16 +55,6 @@ const GameResultsHistory = () => {
     }
   };
 
-  const loadVersions = async () => {
-    if (!gameType) return;
-    
-    try {
-      const data = await getAllScoringVersions(gameType);
-      setVersions(data || []);
-    } catch (err) {
-      console.error('Error loading versions:', err);
-    }
-  };
 
   const handleSessionToggle = (sessionId: string) => {
     setSelectedSessions(prev => 
@@ -78,37 +64,7 @@ const GameResultsHistory = () => {
     );
   };
 
-  const handleCompare = () => {
-    if (selectedSessions.length < 2) {
-      alert('Please select at least 2 sessions to compare');
-      return;
-    }
-    navigate(`/results/${gameType}/compare?sessions=${selectedSessions.join(',')}`);
-  };
 
-  const handleExport = () => {
-    const csv = [
-      ['Date', 'Version', 'Final Score', 'Competencies'].join(','),
-      ...sessions.map(s => {
-        const score = s.final_scores?.final_score || s.scores?.final_score || 0;
-        const version = s.scoring_version?.version_name || 'Unknown';
-        const date = new Date(s.created_at).toLocaleString();
-        return [date, version, score.toFixed(2), 'See details'].join(',');
-      })
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${gameType}_results.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  const filteredSessions = versionFilter === 'all'
-    ? sessions
-    : sessions.filter(s => s.scoring_version?.version_name === versionFilter);
 
   const stats = sessions.length > 0 ? {
     best: Math.max(...sessions.map(s => s.final_scores?.final_score || s.scores?.final_score || 0)),
@@ -214,51 +170,6 @@ const GameResultsHistory = () => {
           </div>
         )}
 
-        {/* Filters and Actions */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4" />
-                  <span className="text-sm font-medium">Filter:</span>
-                </div>
-                <select
-                  value={versionFilter}
-                  onChange={(e) => setVersionFilter(e.target.value)}
-                  className="px-3 py-1 border rounded-md text-sm"
-                >
-                  <option value="all">All Versions</option>
-                  {versions.map(v => (
-                    <option key={v.version_name} value={v.version_name}>
-                      {v.version_name} {v.is_active ? '(Active)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExport}
-                  disabled={sessions.length === 0}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export CSV
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleCompare}
-                  disabled={selectedSessions.length < 2}
-                >
-                  <GitCompare className="w-4 h-4 mr-2" />
-                  Compare Selected ({selectedSessions.length})
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Sessions Table */}
         <Card>
@@ -269,12 +180,10 @@ const GameResultsHistory = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {filteredSessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground mb-4">
-                  {sessions.length === 0 
-                    ? 'No attempts yet. Play this game to see your results!'
-                    : 'No sessions match the selected filter.'}
+                  No attempts yet. Play this game to see your results!
                 </p>
                 {sessions.length === 0 && (
                   <Button asChild>
@@ -291,10 +200,10 @@ const GameResultsHistory = () => {
                     <tr className="border-b">
                       <th className="text-left p-3">
                         <Checkbox
-                          checked={selectedSessions.length === filteredSessions.length && filteredSessions.length > 0}
+                          checked={selectedSessions.length === sessions.length && sessions.length > 0}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setSelectedSessions(filteredSessions.map(s => s.id));
+                              setSelectedSessions(sessions.map(s => s.id));
                             } else {
                               setSelectedSessions([]);
                             }
@@ -308,7 +217,7 @@ const GameResultsHistory = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredSessions.map((session) => {
+                    {sessions.map((session) => {
                       const score = session.final_scores?.final_score || session.scores?.final_score || 0;
                       const version = session.scoring_version?.version_name || 'Unknown';
                       const date = new Date(session.created_at);

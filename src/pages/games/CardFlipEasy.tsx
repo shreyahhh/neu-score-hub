@@ -1001,47 +1001,48 @@ const CardFlipEasy = () => {
       );
       const overallPatternDiscovered = stage1Analysis.patternDiscovered || stage2Analysis.patternDiscovered;
       
-      // Prepare raw data for backend
+      // Extract correct_matches array from moves (for backend)
+      // Backend expects: correct_matches: [{pos1, pos2}, ...]
+      const extractCorrectMatches = (moves: MoveData[]): Array<{pos1: number, pos2: number}> => {
+        const matches: Array<{pos1: number, pos2: number}> = [];
+        moves.forEach(move => {
+          if (move.isCorrectMatch) {
+            matches.push({
+              pos1: move.card1Position,
+              pos2: move.card2Position
+            });
+          }
+        });
+        return matches;
+      };
+
+      // Combine correct matches from both stages
+      const allCorrectMatches = [
+        ...extractCorrectMatches(stage1Data.moves),
+        ...extractCorrectMatches(stage2Data.moves)
+      ];
+
+      // Get earliest discovery move (or 0 if not discovered)
+      const earliestDiscoveryMove = stage1Analysis.discoveryMove > 0 && stage2Analysis.discoveryMove > 0
+        ? Math.min(stage1Analysis.discoveryMove, stage2Analysis.discoveryMove)
+        : stage1Analysis.discoveryMove > 0
+        ? stage1Analysis.discoveryMove
+        : stage2Analysis.discoveryMove > 0
+        ? stage2Analysis.discoveryMove
+        : 0;
+
+      // Prepare raw data for backend in the format it expects
+      // Backend calculateCardFlip expects a flat structure, not nested
       const raw_data = {
-        stage1: {
-          pairs_matched: stage1Data.pairsMatched,
-          total_pairs: STAGE1_CONFIG.totalPairs,
-          total_flips: stage1Data.totalFlips,
-          min_flips_possible: STAGE1_CONFIG.minFlips,
-          time_taken: stage1Data.timeTaken,
-          time_limit: STAGE1_CONFIG.timeLimit,
-          pattern_type: sessionPatternType,
-          pattern_matches: stage1Analysis.patternMatches,
-          random_matches: stage1Analysis.randomMatches,
-          pattern_discovered: stage1Analysis.patternDiscovered,
-          pattern_recognition_score: stage1Analysis.patternRecognitionScore,
-          discovery_move: stage1Analysis.discoveryMove
-        },
-        stage2: {
-          pairs_matched: stage2Data.pairsMatched,
-          total_pairs: STAGE2_CONFIG.totalPairs,
-          total_flips: stage2Data.totalFlips,
-          min_flips_possible: STAGE2_CONFIG.minFlips,
-          time_taken: stage2Data.timeTaken,
-          time_limit: STAGE2_CONFIG.timeLimit,
-          pattern_type: sessionPatternType,
-          pattern_matches: stage2Analysis.patternMatches,
-          random_matches: stage2Analysis.randomMatches,
-          pattern_discovered: stage2Analysis.patternDiscovered,
-          pattern_recognition_score: stage2Analysis.patternRecognitionScore,
-          discovery_move: stage2Analysis.discoveryMove
-        },
-        totals: {
-          total_pairs_matched: stage1Data.pairsMatched + stage2Data.pairsMatched,
-          total_pairs_possible: STAGE1_CONFIG.totalPairs + STAGE2_CONFIG.totalPairs,
-          total_flips: stage1Data.totalFlips + stage2Data.totalFlips,
-          total_min_flips: STAGE1_CONFIG.minFlips + STAGE2_CONFIG.minFlips,
-          total_time_taken: stage1Data.timeTaken + stage2Data.timeTaken,
-          total_time_limit: STAGE1_CONFIG.timeLimit + STAGE2_CONFIG.timeLimit,
-          pattern_type: sessionPatternType,
-          pattern_discovered: overallPatternDiscovered,
-          pattern_recognition_score: scores.raw_stats.overall.pattern_recognition_score
-        }
+        correct_pairs: stage1Data.pairsMatched + stage2Data.pairsMatched,
+        total_pairs: STAGE1_CONFIG.totalPairs + STAGE2_CONFIG.totalPairs,
+        total_flips: stage1Data.totalFlips + stage2Data.totalFlips,
+        minimum_flips: STAGE1_CONFIG.minFlips + STAGE2_CONFIG.minFlips,
+        time_taken: stage1Data.timeTaken + stage2Data.timeTaken,
+        time_limit: STAGE1_CONFIG.timeLimit + STAGE2_CONFIG.timeLimit,
+        session_pattern_type: sessionPatternType,
+        correct_matches: allCorrectMatches,
+        discovery_move: earliestDiscoveryMove
       };
 
       // Try to submit to backend first

@@ -222,15 +222,15 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as GameType)} className="w-full">
           <TabsList className="w-full justify-start overflow-x-auto flex-wrap h-auto bg-muted">
-            <TabsTrigger value="mental_math_sprint" className="text-foreground data-[state=inactive]:text-muted-foreground">Mental Math</TabsTrigger>
-            <TabsTrigger value="stroop_test" className="text-foreground data-[state=inactive]:text-muted-foreground">Stroop Test</TabsTrigger>
-            <TabsTrigger value="sign_sudoku" className="text-foreground data-[state=inactive]:text-muted-foreground">Sign Sudoku</TabsTrigger>
-            <TabsTrigger value="face_name_match" className="text-foreground data-[state=inactive]:text-muted-foreground">Face-Name</TabsTrigger>
-            <TabsTrigger value="card_flip_challenge" className="text-foreground data-[state=inactive]:text-muted-foreground">Card Flip</TabsTrigger>
-            <TabsTrigger value="scenario_challenge" className="text-foreground data-[state=inactive]:text-muted-foreground">Scenario</TabsTrigger>
-            <TabsTrigger value="ai_debate" className="text-foreground data-[state=inactive]:text-muted-foreground">Debate</TabsTrigger>
-            <TabsTrigger value="creative_uses" className="text-foreground data-[state=inactive]:text-muted-foreground">Creative Uses</TabsTrigger>
-            <TabsTrigger value="interview" className="text-foreground data-[state=inactive]:text-muted-foreground">Interview</TabsTrigger>
+            <TabsTrigger value="mental_math_sprint" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Mental Math</TabsTrigger>
+            <TabsTrigger value="stroop_test" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Stroop Test</TabsTrigger>
+            <TabsTrigger value="sign_sudoku" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Sign Sudoku</TabsTrigger>
+            <TabsTrigger value="face_name_match" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Face-Name</TabsTrigger>
+            <TabsTrigger value="card_flip_challenge" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Card Flip</TabsTrigger>
+            <TabsTrigger value="scenario_challenge" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Scenario</TabsTrigger>
+            <TabsTrigger value="ai_debate" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Debate</TabsTrigger>
+            <TabsTrigger value="creative_uses" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Creative Uses</TabsTrigger>
+            <TabsTrigger value="interview" className="data-[state=active]:text-foreground data-[state=inactive]:!text-blue-600">Interview</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[50vh] mt-4">

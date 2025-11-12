@@ -332,53 +332,36 @@ export async function getGameContent(gameType: string, difficulty?: string) {
       url += `?difficulty=${difficulty}`;
     }
 
-    console.log(`[getGameContent] Fetching content from: ${url}`);
-    console.log(`[getGameContent] API_BASE_URL:`, API_BASE_URL);
-
+    // Add timeout to prevent hanging requests (30 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal
     });
-
-    console.log(`[getGameContent] Response status: ${response.status} ${response.statusText}`);
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[getGameContent] Error response body:`, errorText);
-      console.error(`[getGameContent] API Error: Status ${response.status}`);
       throw new Error(`Failed to fetch game content: ${response.status} ${response.statusText}`);
     }
 
-    const responseText = await response.text();
-    console.log(`[getGameContent] Response body:`, responseText);
-    
-    let result;
-    try {
-      result = JSON.parse(responseText);
-    } catch (e) {
-      console.error('[getGameContent] Failed to parse response as JSON:', e);
-      throw new Error(`Invalid JSON response from server: ${responseText.substring(0, 100)}`);
-    }
-    
-    console.log(`[getGameContent] Parsed result:`, result);
+    const result = await response.json();
 
     if (!result.success) {
-      console.error('[getGameContent] Backend returned success: false', result);
       throw new Error(result.error || result.message || 'Backend returned an error');
     }
-
-    console.log(`[getGameContent] Returning data:`, result.data);
     // Return the data with content_id
     return result.data;
   } catch (error: any) {
-    console.error(`[getGameContent] Error fetching game content for ${gameType}:`, error);
-    console.error(`[getGameContent] Error details:`, {
-      message: error?.message,
-      name: error?.name,
-      stack: error?.stack
-    });
     // Don't return fallback - throw error so games know backend fetch failed
     // Games should handle the error and show appropriate message to user
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your connection and try again.');
+    }
     throw error;
   }
 }

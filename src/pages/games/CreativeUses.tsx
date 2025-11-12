@@ -209,7 +209,6 @@ const CreativeUsesGame = () => {
         return (
             <div className="flex flex-col justify-center items-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                <p className="text-muted-foreground">Loading object from backend...</p>
             </div>
         );
     }

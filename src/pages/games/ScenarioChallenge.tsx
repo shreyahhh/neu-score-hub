@@ -57,32 +57,21 @@ const ScenarioChallenge = () => {
                 setLoading(true);
                 // Fetch random scenario from database via /api/content/scenario_challenge
                 const contentData = await getGameContent(GAME_TYPE);
-                console.log('Fetched content from database:', contentData);
-                console.log('Content data type:', typeof contentData);
-                console.log('Has scenario?', !!contentData?.scenario);
-                console.log('Has questions?', !!contentData?.questions);
-                console.log('Questions length:', contentData?.questions?.length);
-                console.log('Questions array:', contentData?.questions);
                 
                 // Validate and transform data structure
                 if (!contentData) {
-                    console.error('contentData is null or undefined');
                     throw new Error('No content data received from database');
                 }
                 if (!contentData.scenario) {
-                    console.error('contentData.scenario is missing:', contentData);
                     throw new Error('Scenario text missing from database response');
                 }
                 if (!contentData.questions) {
-                    console.error('contentData.questions is missing:', contentData);
                     throw new Error('Questions array missing from database response');
                 }
                 if (!Array.isArray(contentData.questions)) {
-                    console.error('contentData.questions is not an array:', typeof contentData.questions, contentData.questions);
                     throw new Error('Questions is not an array');
                 }
                 if (contentData.questions.length === 0) {
-                    console.error('contentData.questions is empty array');
                     throw new Error('Questions array is empty');
                 }
                 
@@ -105,8 +94,6 @@ const ScenarioChallenge = () => {
                 
                 setScenario(transformedScenario);
             } catch (error: any) {
-                console.error("Failed to load scenario from database:", error);
-                console.warn("Using fallback scenario data");
                 // Fallback scenario data
                 const fallbackScenario: Scenario = {
                     content_id: 'fallback-scenario-1',
@@ -227,7 +214,6 @@ const ScenarioChallenge = () => {
                 time_per_question: responses.map(r => r.time_taken) // Array of times per question
             };
             
-            console.log('Submitting scenario challenge with data:', { gameType: GAME_TYPE, responseData, contentId });
             // Submit with content_id to track which scenario was used
             const result = await submitAIGame(
                 GAME_TYPE, 
@@ -236,7 +222,6 @@ const ScenarioChallenge = () => {
                 contentId || undefined
             );
 
-            console.log('Scenario challenge result from backend:', result);
 
             // Backend returns { session_id, version_used, ai_scores, final_scores } for AI games
             if (result && (result.final_scores || result.scores || result.session_id)) {
@@ -294,7 +279,6 @@ const ScenarioChallenge = () => {
         return (
             <div className="flex flex-col justify-center items-center h-64">
                 <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                <p className="text-muted-foreground">Loading scenario from backend...</p>
             </div>
         );
     }

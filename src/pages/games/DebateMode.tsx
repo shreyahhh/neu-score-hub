@@ -58,7 +58,6 @@ const DebateMode = () => {
         setLoading(true);
         // Fetch random debate topic from database via /api/content/ai_debate
         const contentData = await getGameContent(GAME_TYPE);
-        console.log('Fetched debate content from database:', contentData);
         
         // Extract statement/topic from content data
         // Backend returns 'statement' field
@@ -86,13 +85,7 @@ const DebateMode = () => {
           setTimePerArgument(DEFAULT_TIME_PER_ARGUMENT);
         }
       } catch (error: any) {
-        console.error('Failed to load debate topic from database:', error);
         const errorMessage = error?.message || 'Failed to load debate topic from backend';
-        console.error("Error details:", {
-            message: errorMessage,
-            stack: error?.stack,
-            gameType: GAME_TYPE
-        });
         // Show error - backend must provide content
         setError(`Failed to load debate topic from backend: ${errorMessage}. Please ensure backend is running and has content in database.`);
       } finally {
@@ -259,18 +252,6 @@ const DebateMode = () => {
         cons_time_taken: finalConsTime   // Individual time for reference
       };
 
-      // Log the actual data being sent for debugging
-      console.log('📤 Submitting debate game with data:', {
-        gameType: GAME_TYPE,
-        responseData: {
-          ...responseData,
-          user_argument_length: responseData.user_argument?.length || 0,
-          user_argument_preview: responseData.user_argument?.substring(0, 100) + '...',
-          pros_text_length: responseData.pros_text?.length || 0,
-          cons_text_length: responseData.cons_text?.length || 0
-        },
-        contentId
-      });
       const gameResult = await submitAIGame(
         GAME_TYPE, 
         responseData, 
@@ -278,39 +259,16 @@ const DebateMode = () => {
         contentId || undefined
       );
 
-      console.log('Debate game result from backend:', gameResult);
-      console.log('Debate game result type:', typeof gameResult);
-      console.log('Debate game result keys:', gameResult ? Object.keys(gameResult) : 'null/undefined');
-
       // Backend returns { session_id, version_used, ai_scores, final_scores } for AI games
       if (gameResult && (gameResult.final_scores || gameResult.scores || gameResult.session_id)) {
-        // Check if scores are all zeros (might indicate backend issue)
-        const finalScore = gameResult.final_scores?.final_score || gameResult.scores?.final_score || 0;
-        const aiScores = gameResult.final_scores?.ai_scores || gameResult.ai_scores || {};
-        
-        console.log('Final score:', finalScore);
-        console.log('AI scores:', aiScores);
-        
-        // Warn if all scores are 0 (might indicate backend configuration issue)
-        if (finalScore === 0 && Object.values(aiScores).every((score: any) => score === 0 || typeof score !== 'number')) {
-          console.warn('⚠️ All scores are 0. This might indicate:');
-          console.warn('  1. Backend Gemini API key not configured in production');
-          console.warn('  2. Backend API endpoint not reachable from deployed site');
-          console.warn('  3. Backend returning mock/fallback scores');
-          console.warn('  4. Check backend logs for AI scoring errors');
-        }
-        
         setResult(gameResult);
         setGameState('results');
       } else {
-        console.error('Invalid result from backend - missing scores or session_id:', gameResult);
         throw new Error(`Invalid response from backend. Expected scores or session_id, got: ${JSON.stringify(gameResult)}`);
       }
     } catch (error: any) {
-      console.error('Error submitting debate:', error);
       const errorMessage = error?.message || 'Unknown error';
-      console.error('Error details:', { error, message: errorMessage, stack: error?.stack });
-      alert(`Failed to submit debate: ${errorMessage}. Check console for details.`);
+      alert(`Failed to submit debate: ${errorMessage}.`);
       setGameState('consWriting');
     } finally {
       setSubmitting(false);
@@ -345,7 +303,6 @@ const DebateMode = () => {
     return (
       <div className="container mx-auto px-6 py-8 min-h-screen flex flex-col items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin mb-4" />
-        <p className="text-muted-foreground">Loading debate topic from backend...</p>
       </div>
     );
   }

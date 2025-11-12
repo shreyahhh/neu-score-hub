@@ -116,14 +116,13 @@ export function Sidebar() {
 
         {/* Footer - Scoring Controls */}
         <div className="p-4 border-t border-sidebar-border">
-          <Button
+          <button
             onClick={() => setIsModalOpen(true)}
-            variant="outline"
-            className="w-full justify-start gap-2 border-sidebar-border hover:bg-sidebar-accent"
+            className="w-full flex items-center justify-start gap-2 px-3 py-2 rounded-md border border-sidebar-border bg-background text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary transition-colors text-sm font-medium"
           >
             <Settings className="w-4 h-4" />
             Scoring Controls
-          </Button>
+          </button>
         </div>
       </aside>
 
