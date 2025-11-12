@@ -59,22 +59,40 @@ const VersionComparison = () => {
       setLoading(true);
       setError(null);
 
+      console.log('[VersionComparison] Loading comparison data for:', { gameType, sessionIds });
+
       // Load all sessions for this game
       const allSessions = await getResultsHistory(gameType, DEFAULT_USER_ID);
-      const selectedSessions = allSessions.filter((s: Session) => 
-        sessionIds.includes(s.id)
-      ).sort((a: Session, b: Session) => 
+      console.log('[VersionComparison] Loaded sessions:', allSessions.length, allSessions);
+      console.log('[VersionComparison] Looking for session IDs:', sessionIds);
+      
+      // Filter sessions - try both exact match and string comparison
+      const selectedSessions = allSessions.filter((s: Session) => {
+        const matches = sessionIds.includes(s.id) || sessionIds.includes(String(s.id));
+        if (matches) {
+          console.log('[VersionComparison] Found matching session:', s.id, s);
+        }
+        return matches;
+      }).sort((a: Session, b: Session) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
+      console.log('[VersionComparison] Selected sessions:', selectedSessions.length, selectedSessions);
+
       if (selectedSessions.length === 0) {
-        throw new Error('No sessions found with the provided IDs');
+        console.error('[VersionComparison] No sessions matched. Available IDs:', allSessions.map((s: Session) => s.id));
+        throw new Error(`No sessions found with the provided IDs. Found ${allSessions.length} total sessions for this game.`);
+      }
+
+      if (selectedSessions.length < 2) {
+        throw new Error('Please select at least 2 sessions to compare');
       }
 
       setSessions(selectedSessions);
 
       // Load version configs
       const versionData = await getAllScoringVersions(gameType);
+      console.log('[VersionComparison] Loaded versions:', versionData);
       setVersions(versionData || []);
     } catch (err) {
       console.error('Error loading comparison data:', err);

@@ -230,6 +230,7 @@ export function ScoringControlsModal({ open, onOpenChange }: ScoringControlsModa
             <TabsTrigger value="scenario_challenge" className="text-foreground data-[state=inactive]:text-muted-foreground">Scenario</TabsTrigger>
             <TabsTrigger value="ai_debate" className="text-foreground data-[state=inactive]:text-muted-foreground">Debate</TabsTrigger>
             <TabsTrigger value="creative_uses" className="text-foreground data-[state=inactive]:text-muted-foreground">Creative Uses</TabsTrigger>
+            <TabsTrigger value="interview" className="text-foreground data-[state=inactive]:text-muted-foreground">Interview</TabsTrigger>
           </TabsList>
 
           <ScrollArea className="h-[50vh] mt-4">

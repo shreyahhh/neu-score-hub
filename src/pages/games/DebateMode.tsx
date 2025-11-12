@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 type GameState = 'instructions' | 'statementDisplay' | 'prosWriting' | 'consWriting' | 'completing' | 'results';
 
 const GAME_TYPE = 'ai_debate';
-const TIME_PER_ARGUMENT = 90; // 90 seconds per argument
+const DEFAULT_TIME_PER_ARGUMENT = 90; // Default 90 seconds per argument
 const STATEMENT_DISPLAY_TIME = 5; // 5 seconds to display statement
 
 // ============================================================================
@@ -44,6 +44,7 @@ const DebateMode = () => {
   const [statementCountdown, setStatementCountdown] = useState(STATEMENT_DISPLAY_TIME);
   const [prosTimeTaken, setProsTimeTaken] = useState<number>(0);
   const [consTimeTaken, setConsTimeTaken] = useState<number>(0);
+  const [timePerArgument, setTimePerArgument] = useState<number>(DEFAULT_TIME_PER_ARGUMENT); // Configurable time limit
 
   const [contentId, setContentId] = useState<string | null>(null); // Track which content was used
 
@@ -60,6 +61,7 @@ const DebateMode = () => {
         console.log('Fetched debate content from database:', contentData);
         
         // Extract statement/topic from content data
+        // Backend returns 'statement' field
         const statement = contentData?.statement || 
                          contentData?.topic || 
                          contentData?.debate_statement ||
@@ -73,8 +75,15 @@ const DebateMode = () => {
         }
         
         // Update time limits if provided in content
+        // Backend can provide time_limit_pros and time_limit_cons
         if (contentData?.time_limit_pros) {
-          // Could update TIME_PER_ARGUMENT if needed, but keeping it constant for now
+          setTimePerArgument(contentData.time_limit_pros);
+        } else if (contentData?.time_limit_cons) {
+          setTimePerArgument(contentData.time_limit_cons);
+        } else if (contentData?.time_limit) {
+          setTimePerArgument(contentData.time_limit);
+        } else {
+          setTimePerArgument(DEFAULT_TIME_PER_ARGUMENT);
         }
       } catch (error: any) {
         console.error('Failed to load debate topic from database:', error);
@@ -104,7 +113,10 @@ const DebateMode = () => {
         setStatementCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            startProsWriting();
+            // Start pros writing when countdown reaches 0
+            setProsStartTime(Date.now());
+            setIsProsTimerRunning(true);
+            setGameState('prosWriting');
             return 0;
           }
           return prev - 1;
@@ -146,7 +158,7 @@ const DebateMode = () => {
 
   const handleProsSubmit = () => {
     setIsProsTimerRunning(false);
-    const timeTaken = prosStartTime > 0 ? (Date.now() - prosStartTime) / 1000 : TIME_PER_ARGUMENT;
+    const timeTaken = prosStartTime > 0 ? (Date.now() - prosStartTime) / 1000 : timePerArgument;
     setProsTimeTaken(timeTaken);
     // Move to CONS writing phase
     setTimeout(() => {
@@ -170,20 +182,45 @@ const DebateMode = () => {
     try {
       // Use stored time taken, or calculate if not set
       const finalProsTime = prosTimeTaken > 0 ? prosTimeTaken : 
-        (prosStartTime > 0 ? (Date.now() - prosStartTime) / 1000 : TIME_PER_ARGUMENT);
+        (prosStartTime > 0 ? (Date.now() - prosStartTime) / 1000 : timePerArgument);
       
       const finalConsTime = consTimeTaken > 0 ? consTimeTaken :
-        (consStartTime > 0 ? (Date.now() - consStartTime) / 1000 : TIME_PER_ARGUMENT);
+        (consStartTime > 0 ? (Date.now() - consStartTime) / 1000 : timePerArgument);
 
       // Submit both arguments to backend in the format it expects
+      // Backend expects: topic, pros_text, cons_text, num_points_pros, num_points_cons, time_taken
+      // Backend variables: pros_text, cons_text, num_points_pros, num_points_cons, balance_score, 
+      // depth, evidence_used, language_quality, logical_consistency, time_taken, perspective_switching_ability
+      const totalTimeTaken = finalProsTime + finalConsTime;
+      
+      // Count points more accurately (sentences, bullet points, or paragraphs)
+      const prosPoints = prosArgument.trim() 
+        ? Math.max(1, prosArgument
+            .split(/\n+|\.\s+|•|[-*]\s+/)
+            .filter(line => line.trim().length > 15) // Filter out very short segments
+            .length)
+        : 1;
+      const consPoints = consArgument.trim()
+        ? Math.max(1, consArgument
+            .split(/\n+|\.\s+|•|[-*]\s+/)
+            .filter(line => line.trim().length > 15) // Filter out very short segments
+            .length)
+        : 1;
+
+      // Prepare response data matching backend's expected format exactly
+      // Backend will extract variables: pros_text, cons_text, num_points_pros, num_points_cons, time_taken
+      // Backend will calculate: balance_score, depth, evidence_used, language_quality, logical_consistency, perspective_switching_ability
       const responseData = {
-        debate_statement: debateTopic,
-        pros_text: prosArgument,
-        pros_time_taken: finalProsTime,
-        cons_text: consArgument,
-        cons_time_taken: finalConsTime,
-        num_points_pros: prosArgument.split('\n').filter(line => line.trim().length > 0).length,
-        num_points_cons: consArgument.split('\n').filter(line => line.trim().length > 0).length
+        topic: debateTopic,  // Debate topic/statement
+        pros_text: prosArgument || '',  // Pros arguments text (required)
+        cons_text: consArgument || '',  // Cons arguments text (required)
+        num_points_pros: prosPoints,  // Number of pros points
+        num_points_cons: consPoints,  // Number of cons points
+        time_taken: totalTimeTaken,  // Total time for both arguments (seconds)
+        // Include aliases for compatibility
+        debate_statement: debateTopic,  // Alias for topic
+        pros_time_taken: finalProsTime,  // Individual time for reference
+        cons_time_taken: finalConsTime   // Individual time for reference
       };
 
       // Submit with content_id to track which debate topic was used
@@ -222,7 +259,7 @@ const DebateMode = () => {
 
   const handleProsTimeout = () => {
     setIsProsTimerRunning(false);
-    setProsTimeTaken(TIME_PER_ARGUMENT); // Full time used
+    setProsTimeTaken(timePerArgument); // Full time used
     // Auto-submit pros and move to cons
     setTimeout(() => {
       startConsWriting();
@@ -231,7 +268,7 @@ const DebateMode = () => {
 
   const handleConsTimeout = async () => {
     setIsConsTimerRunning(false);
-    setConsTimeTaken(TIME_PER_ARGUMENT); // Full time used
+    setConsTimeTaken(timePerArgument); // Full time used
     // Auto-submit with whatever arguments we have
     await handleConsSubmit();
   };
@@ -291,13 +328,10 @@ const DebateMode = () => {
               <div>
                 <h3 className="text-lg font-semibold mb-2">Instructions</h3>
                 <p className="text-muted-foreground mb-4">
-                  You will be shown a controversial statement.
-                </p>
-                <p className="text-muted-foreground mb-4">
                   Your task is to argue BOTH sides. First, you will write for the PROS. Second, you will write for the CONS.
                 </p>
                 <p className="text-muted-foreground mb-4">
-                  You will have 90 seconds to write your argument for each side.
+                  You will have {timePerArgument} seconds to write your argument for each side.
                 </p>
                 <p className="text-muted-foreground mb-4">
                   Your arguments will be analyzed. Good luck.
@@ -307,8 +341,8 @@ const DebateMode = () => {
                 <h4 className="font-semibold mb-2">Game Details:</h4>
                 <ul className="space-y-1 text-sm">
                   <li>• 1 debate statement</li>
-                  <li>• 90 seconds for PROS argument</li>
-                  <li>• 90 seconds for CONS argument</li>
+                  <li>• {timePerArgument} seconds for PROS argument</li>
+                  <li>• {timePerArgument} seconds for CONS argument</li>
                   <li>• AI evaluation of reasoning, analysis, and communication</li>
                 </ul>
               </div>
@@ -365,9 +399,9 @@ const DebateMode = () => {
                 <Timer
                   key="pros"
                   isRunning={isProsTimerRunning}
-                  initialTime={TIME_PER_ARGUMENT}
+                  initialTime={timePerArgument}
                   countDown
-                  maxTime={TIME_PER_ARGUMENT}
+                  maxTime={timePerArgument}
                   onComplete={handleProsTimeout}
                 />
               </div>
@@ -418,9 +452,9 @@ const DebateMode = () => {
                 <Timer
                   key="cons"
                   isRunning={isConsTimerRunning}
-                  initialTime={TIME_PER_ARGUMENT}
+                  initialTime={timePerArgument}
                   countDown
-                  maxTime={TIME_PER_ARGUMENT}
+                  maxTime={timePerArgument}
                   onComplete={handleConsTimeout}
                 />
               </div>

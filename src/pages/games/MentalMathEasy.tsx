@@ -35,7 +35,7 @@ const MentalMathEasy = () => {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  const timePerQuestion = 5; // Default 5 seconds
+  const timePerQuestion = 7; // 7 seconds per question
 
   const startGame = () => {
     setGameState('playing');

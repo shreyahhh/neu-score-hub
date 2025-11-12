@@ -21,8 +21,7 @@ const DEFAULT_GAME_DURATION = 60; // seconds
 const FALLBACK_OBJECTS = [
     'A Paperclip',
     'A Bottle',
-    'A Pencil',
-    'A Brick'
+    'A Pencil'
 ];
 
 // Get a random fallback object
@@ -248,7 +247,7 @@ const CreativeUsesGame = () => {
                                 <ul className="space-y-1 text-sm">
                                     <li>• {gameDuration} seconds to complete</li>
                                     <li>• Be creative and think outside the box!</li>
-                                    {object && <li>• Object: <strong>{object}</strong></li>}
+                                    {object && <li>• Object: <strong>{object.replace(/^A /, '')}</strong></li>}
                                 </ul>
                             </div>
                             <Button onClick={startGame} className="w-full" size="lg">
@@ -282,7 +281,7 @@ const CreativeUsesGame = () => {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="mb-4">List as many creative uses as you can for a: <strong className="text-primary capitalize">{object}</strong></p>
+                    <p className="mb-4">List as many creative uses as you can for: <strong className="text-primary capitalize">{object.replace(/^A /, '')}</strong></p>
                 <div className="flex gap-2 mb-4">
                     <Input
                         value={currentUse}

@@ -28,6 +28,7 @@ const games = [
   { name: 'Scenario Challenge', path: '/games/scenario-challenge', icon: MessageSquare },
   { name: 'Debate Mode', path: '/games/debate-mode', icon: MessageSquare },
   { name: 'Creative Uses', path: '/games/creative-uses', icon: Lightbulb },
+  { name: 'Interview Assessment', path: '/games/interview', icon: MessageSquare },
   { name: 'Pattern Sudoku', path: '/games/pattern-sudoku', icon: Grid3x3 },
 ];
 

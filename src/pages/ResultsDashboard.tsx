@@ -18,6 +18,7 @@ const ALL_GAME_TYPES = [
   'scenario_challenge',
   'ai_debate',
   'creative_uses',
+  'interview',
   // 'statement_reasoning', // Removed from frontend
   // 'vocab_challenge', // Removed from frontend
   // 'lucky_flip', // Removed from frontend
@@ -93,17 +94,33 @@ const ResultsDashboard = () => {
                 }
               }
               
-              // Method 2: scores.final_score (regular games)
+              // Method 2: scores.final_score (regular games like card_flip_challenge)
               if (score === 0 && s.scores) {
                 if (typeof s.scores === 'string') {
                   try {
                     const parsed = JSON.parse(s.scores);
                     score = parsed.final_score || 0;
+                    console.log(`[ResultsDashboard] Extracted score from parsed scores string:`, score);
                   } catch (e) {
                     console.warn(`[ResultsDashboard] Failed to parse scores as JSON:`, e);
                   }
-                } else if (typeof s.scores === 'object') {
+                } else if (typeof s.scores === 'object' && s.scores !== null) {
+                  // Backend returns: { scores: { final_score: X, competencies: {...} } }
                   score = s.scores.final_score || 0;
+                  console.log(`[ResultsDashboard] Extracted score from scores object:`, score);
+                  
+                  // If still 0, try to calculate from competencies (fallback)
+                  if (score === 0 && s.scores.competencies) {
+                    const competencies = s.scores.competencies;
+                    const weightedScores = Object.values(competencies)
+                      .map((comp: any) => comp.weighted || (comp.raw * comp.weight) || 0)
+                      .filter((v: any) => typeof v === 'number' && !isNaN(v));
+                    
+                    if (weightedScores.length > 0) {
+                      score = weightedScores.reduce((a: number, b: number) => a + b, 0);
+                      console.log(`[ResultsDashboard] Calculated score from competencies:`, score);
+                    }
+                  }
                 }
               }
               

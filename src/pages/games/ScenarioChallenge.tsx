@@ -58,10 +58,32 @@ const ScenarioChallenge = () => {
                 // Fetch random scenario from database via /api/content/scenario_challenge
                 const contentData = await getGameContent(GAME_TYPE);
                 console.log('Fetched content from database:', contentData);
+                console.log('Content data type:', typeof contentData);
+                console.log('Has scenario?', !!contentData?.scenario);
+                console.log('Has questions?', !!contentData?.questions);
+                console.log('Questions length:', contentData?.questions?.length);
+                console.log('Questions array:', contentData?.questions);
                 
                 // Validate and transform data structure
-                if (!contentData || !contentData.scenario || !contentData.questions || contentData.questions.length === 0) {
-                    throw new Error('Invalid scenario data from database');
+                if (!contentData) {
+                    console.error('contentData is null or undefined');
+                    throw new Error('No content data received from database');
+                }
+                if (!contentData.scenario) {
+                    console.error('contentData.scenario is missing:', contentData);
+                    throw new Error('Scenario text missing from database response');
+                }
+                if (!contentData.questions) {
+                    console.error('contentData.questions is missing:', contentData);
+                    throw new Error('Questions array missing from database response');
+                }
+                if (!Array.isArray(contentData.questions)) {
+                    console.error('contentData.questions is not an array:', typeof contentData.questions, contentData.questions);
+                    throw new Error('Questions is not an array');
+                }
+                if (contentData.questions.length === 0) {
+                    console.error('contentData.questions is empty array');
+                    throw new Error('Questions array is empty');
                 }
                 
                 // Store content_id for submission
@@ -173,20 +195,36 @@ const ScenarioChallenge = () => {
         }
     };
 
-    // Submit all responses at once to create a single session
+    // Submit all responses - backend expects each question as separate submission
+    // or combined with scenario_text and user_response
     const submitAllResponses = async (responses: ResponseData[]) => {
         try {
             setSubmitting(true);
             
+            if (!scenario) {
+                throw new Error('Scenario data not available');
+            }
+
+            // Backend expects format: { scenario_text, user_response }
+            // For multiple questions, we'll submit the last response (or combine all)
+            // The backend will evaluate based on scenario_text and user_response
+            const lastResponse = responses[responses.length - 1];
+            
+            // Combine all responses into a single user_response if multiple questions
+            const combinedResponse = responses.length > 1
+                ? responses.map((r, idx) => `Question ${idx + 1}: ${r.question_text}\n\nAnswer: ${r.response_text}`).join('\n\n')
+                : lastResponse.response_text;
+
             // Prepare response data in the format backend expects
-            // Backend expects: { responses: [...] }
+            // Backend expects: { scenario_text, user_response, question_text?, time_taken? }
             const responseData = {
-                responses: responses.map(r => ({
-                    question_id: r.question_id,
-                    question_text: r.question_text,
-                    response_text: r.response_text,
-                    time_taken: r.time_taken
-                }))
+                scenario_text: scenario.scenario,
+                user_response: combinedResponse,
+                question_text: lastResponse.question_text, // Include for reference
+                response_text: combinedResponse, // Alias for compatibility
+                response_length: combinedResponse.length,
+                time_taken: responses.reduce((sum, r) => sum + r.time_taken, 0) / responses.length, // Average time
+                time_per_question: responses.map(r => r.time_taken) // Array of times per question
             };
             
             console.log('Submitting scenario challenge with data:', { gameType: GAME_TYPE, responseData, contentId });

@@ -21,7 +21,7 @@ interface PuzzleConfig {
 const DIFFICULTY_CONFIG: Record<Difficulty, PuzzleConfig> = {
   easy: { size: 4, timer: 60, patterns: ['●', '■', '▲', '★'] },
   medium: { size: 5, timer: 90, patterns: ['●', '■', '▲', '★', '◆'] },
-  hard: { size: 6, timer: 120, patterns: ['●', '■', '▲', '★', '◆', '✕'] },
+  hard: { size: 5, timer: 120, patterns: ['●', '■', '▲', '★', '◆'] },
 };
 
 const PUZZLE_DATA = {
@@ -287,7 +287,6 @@ const PatternSudoku = () => {
                   <li>• Timer: 60 seconds</li>
                   <li>• 1 puzzle per level</li>
                   <li>• Empty cells: 9 cells</li>
-                  <li>• Focus: Math, Reasoning, Speed</li>
                 </ul>
               </div>
               <Button className="w-full mt-4">Select</Button>
@@ -301,7 +300,6 @@ const PatternSudoku = () => {
                   <li>• Timer: 90 seconds</li>
                   <li>• 1 puzzle per level</li>
                   <li>• Empty cells: 14 cells</li>
-                  <li>• Focus: Mental Stamina</li>
                 </ul>
               </div>
               <Button className="w-full mt-4">Select</Button>
@@ -310,12 +308,11 @@ const PatternSudoku = () => {
             <Card className="p-6 cursor-pointer hover:border-primary transition-colors" onClick={() => startGame('hard')}>
               <h2 className="text-2xl font-bold mb-4">Hard</h2>
               <div className="space-y-2 text-sm">
-                <p><span className="font-semibold">Grid:</span> 6x6</p>
+                <p><span className="font-semibold">Grid:</span> 5x5</p>
                 <ul className="space-y-1 text-sm">
                   <li>• Timer: 120 seconds</li>
                   <li>• 1 puzzle per level</li>
-                  <li>• Empty cells: 18 cells</li>
-                  <li>• Focus: Attention to Detail, Accuracy</li>
+                  <li>• Empty cells: 20 cells</li>
                 </ul>
               </div>
               <Button className="w-full mt-4">Select</Button>

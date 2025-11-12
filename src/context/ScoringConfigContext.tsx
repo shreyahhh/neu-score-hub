@@ -14,7 +14,8 @@ export type GameType =
   | 'card_flip_challenge'
   | 'scenario_challenge'
   | 'ai_debate'
-  | 'creative_uses';
+  | 'creative_uses'
+  | 'interview';
 
 interface ScoringConfigContextType {
   config: Record<GameType, ScoringConfig | null>;

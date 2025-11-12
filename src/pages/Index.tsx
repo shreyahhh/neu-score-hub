@@ -29,7 +29,7 @@ const Index = () => {
           <Card className="border-2 hover:border-primary transition-colors">
             <CardHeader>
               <Target className="w-10 h-10 text-primary mb-2" />
-              <CardTitle>8 Cognitive Games</CardTitle>
+              <CardTitle>9 Cognitive Games</CardTitle>
               <CardDescription>
                 Test memory, reasoning, speed, creativity, and more through interactive challenges
               </CardDescription>
@@ -73,7 +73,7 @@ const Index = () => {
               <div>
                 <h3 className="font-semibold mb-1">Select a Game</h3>
                 <p className="text-muted-foreground">
-                  Choose from 8 cognitive games in the left sidebar. Each game tests different competencies
+                  Choose from 9 cognitive games in the left sidebar. Each game tests different competencies
                   like memory, reasoning, speed, and creativity.
                 </p>
               </div>
@@ -212,6 +212,16 @@ const Index = () => {
                   Tests: Creativity (Originality, Diversity), Speed
                 </p>
                 <Link to="/games/creative-uses">
+                  <Button size="sm" variant="outline">Try It</Button>
+                </Link>
+              </div>
+
+              <div className="p-4 border rounded-lg hover:border-primary transition-colors">
+                <h3 className="font-semibold mb-2">Interview Assessment (AI)</h3>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Tests: Communication, Reasoning, Professional Competence
+                </p>
+                <Link to="/games/interview">
                   <Button size="sm" variant="outline">Try It</Button>
                 </Link>
               </div>
