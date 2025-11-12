@@ -1,6 +1,19 @@
 // Central API Client for NeuRazor Backend
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
+// Log API configuration for debugging (only in development or if explicitly enabled)
+if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_API) {
+  console.log('[API Config] API_BASE_URL:', API_BASE_URL);
+  console.log('[API Config] VITE_API_BASE_URL env var:', import.meta.env.VITE_API_BASE_URL || '(not set - using default)');
+  console.log('[API Config] Environment:', import.meta.env.MODE);
+  
+  // Warn if using default localhost in production build
+  if (!import.meta.env.DEV && API_BASE_URL === 'http://localhost:3000') {
+    console.error('[API Config] ⚠️ WARNING: Using default localhost URL in production!');
+    console.error('[API Config] Set VITE_API_BASE_URL environment variable to your production backend URL.');
+  }
+}
+
 // Default test user ID (from backend documentation)
 export const DEFAULT_USER_ID = '53f77b43-d71a-4edf-8b80-c70b975264d8';
 

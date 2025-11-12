@@ -206,32 +206,71 @@ const DebateMode = () => {
             .length)
         : 1;
 
+      // Validate that we have actual arguments before proceeding
+      const prosTrimmed = prosArgument?.trim() || '';
+      const consTrimmed = consArgument?.trim() || '';
+      
+      if (!prosTrimmed && !consTrimmed) {
+        console.error('⚠️ Both pros and cons arguments are empty!');
+        alert('Please provide at least one argument (pros or cons) before submitting.');
+        setSubmitting(false);
+        setGameState('consWriting');
+        return;
+      }
+
       // Combine pros and cons into a single user_argument field that backend expects
       // Format it clearly so AI can evaluate both sides
-      const combinedArgument = `PROS ARGUMENT (Arguing FOR the topic):
-${prosArgument || '(No pros argument provided)'}
-
-CONS ARGUMENT (Arguing AGAINST the topic):
-${consArgument || '(No cons argument provided)'}`;
+      // Only include sections that have actual content
+      let combinedArgument = '';
+      
+      if (prosTrimmed) {
+        combinedArgument += `PROS ARGUMENT (Arguing FOR the topic):\n${prosTrimmed}\n\n`;
+      }
+      
+      if (consTrimmed) {
+        combinedArgument += `CONS ARGUMENT (Arguing AGAINST the topic):\n${consTrimmed}`;
+      }
+      
+      // Ensure we have content
+      if (!combinedArgument.trim()) {
+        console.error('⚠️ Combined argument is empty after processing!');
+        alert('Error: Unable to prepare arguments for submission. Please try again.');
+        setSubmitting(false);
+        setGameState('consWriting');
+        return;
+      }
 
       // Prepare response data matching backend's expected format
       // Backend ai.service.js buildPrompt() looks for: topic, user_argument
+      // Also include response_text and response_length for compatibility (like Scenario Challenge)
       const responseData = {
-        topic: debateTopic,  // Debate topic/statement (required by backend)
-        user_argument: combinedArgument,  // Combined pros + cons arguments (required by backend)
+        topic: debateTopic?.trim() || '',  // Debate topic/statement (required by backend)
+        user_argument: combinedArgument,  // Combined pros + cons arguments (required by backend ai.service.js)
+        response_text: combinedArgument,  // Alias for compatibility with calculator.service.js
+        response_length: combinedArgument.length,  // Length for stats (like Scenario Challenge)
         // Include additional fields for potential future use or compatibility
-        pros_text: prosArgument || '',  // Keep for reference
-        cons_text: consArgument || '',  // Keep for reference
+        pros_text: prosTrimmed,  // Use trimmed version
+        cons_text: consTrimmed,  // Use trimmed version
         num_points_pros: prosPoints,  // Number of pros points
         num_points_cons: consPoints,  // Number of cons points
         time_taken: totalTimeTaken,  // Total time for both arguments (seconds)
-        debate_statement: debateTopic,  // Alias for topic
+        debate_statement: debateTopic?.trim() || '',  // Alias for topic
         pros_time_taken: finalProsTime,  // Individual time for reference
         cons_time_taken: finalConsTime   // Individual time for reference
       };
 
-      // Submit with content_id to track which debate topic was used
-      console.log('Submitting debate game with data:', { gameType: GAME_TYPE, responseData, contentId });
+      // Log the actual data being sent for debugging
+      console.log('📤 Submitting debate game with data:', {
+        gameType: GAME_TYPE,
+        responseData: {
+          ...responseData,
+          user_argument_length: responseData.user_argument?.length || 0,
+          user_argument_preview: responseData.user_argument?.substring(0, 100) + '...',
+          pros_text_length: responseData.pros_text?.length || 0,
+          cons_text_length: responseData.cons_text?.length || 0
+        },
+        contentId
+      });
       const gameResult = await submitAIGame(
         GAME_TYPE, 
         responseData, 
@@ -240,9 +279,27 @@ ${consArgument || '(No cons argument provided)'}`;
       );
 
       console.log('Debate game result from backend:', gameResult);
+      console.log('Debate game result type:', typeof gameResult);
+      console.log('Debate game result keys:', gameResult ? Object.keys(gameResult) : 'null/undefined');
 
       // Backend returns { session_id, version_used, ai_scores, final_scores } for AI games
       if (gameResult && (gameResult.final_scores || gameResult.scores || gameResult.session_id)) {
+        // Check if scores are all zeros (might indicate backend issue)
+        const finalScore = gameResult.final_scores?.final_score || gameResult.scores?.final_score || 0;
+        const aiScores = gameResult.final_scores?.ai_scores || gameResult.ai_scores || {};
+        
+        console.log('Final score:', finalScore);
+        console.log('AI scores:', aiScores);
+        
+        // Warn if all scores are 0 (might indicate backend configuration issue)
+        if (finalScore === 0 && Object.values(aiScores).every((score: any) => score === 0 || typeof score !== 'number')) {
+          console.warn('⚠️ All scores are 0. This might indicate:');
+          console.warn('  1. Backend Gemini API key not configured in production');
+          console.warn('  2. Backend API endpoint not reachable from deployed site');
+          console.warn('  3. Backend returning mock/fallback scores');
+          console.warn('  4. Check backend logs for AI scoring errors');
+        }
+        
         setResult(gameResult);
         setGameState('results');
       } else {
