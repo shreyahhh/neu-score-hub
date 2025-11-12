@@ -56,15 +56,18 @@
   user_id: "uuid",
   content_id: "uuid",              // Optional: which topic was used
   response_data: {
-    topic: "Is remote work better than office work?",  // Debate topic/statement
-    pros_text: "User's argument for the PROS side...",  // Pros arguments text
-    cons_text: "User's argument for the CONS side...",  // Cons arguments text
+    topic: "Is remote work better than office work?",  // Debate topic/statement (required by backend)
+    user_argument: "PROS ARGUMENT (Arguing FOR the topic):\n...\n\nCONS ARGUMENT (Arguing AGAINST the topic):\n...",  // Combined pros + cons (required by backend ai.service.js)
+    pros_text: "User's argument for the PROS side...",  // Pros arguments text (kept for reference)
+    cons_text: "User's argument for the CONS side...",  // Cons arguments text (kept for reference)
     num_points_pros: 5,             // Number of pros points/arguments
     num_points_cons: 4,             // Number of cons points/arguments
     time_taken: 180.5               // Total time for both arguments (seconds)
   }
 }
 ```
+
+**Note:** The backend `ai.service.js` expects `topic` and `user_argument` fields. The frontend combines `pros_text` and `cons_text` into a single `user_argument` field with clear labels so the AI can evaluate both sides.
 
 ### Data Collection
 - **Topic:** Fetched from backend or fallback

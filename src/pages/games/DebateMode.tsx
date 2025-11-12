@@ -188,9 +188,8 @@ const DebateMode = () => {
         (consStartTime > 0 ? (Date.now() - consStartTime) / 1000 : timePerArgument);
 
       // Submit both arguments to backend in the format it expects
-      // Backend expects: topic, pros_text, cons_text, num_points_pros, num_points_cons, time_taken
-      // Backend variables: pros_text, cons_text, num_points_pros, num_points_cons, balance_score, 
-      // depth, evidence_used, language_quality, logical_consistency, time_taken, perspective_switching_ability
+      // Backend ai.service.js expects: topic, user_argument (combined pros + cons)
+      // Backend will use user_argument to evaluate both sides of the debate
       const totalTimeTaken = finalProsTime + finalConsTime;
       
       // Count points more accurately (sentences, bullet points, or paragraphs)
@@ -207,17 +206,25 @@ const DebateMode = () => {
             .length)
         : 1;
 
-      // Prepare response data matching backend's expected format exactly
-      // Backend will extract variables: pros_text, cons_text, num_points_pros, num_points_cons, time_taken
-      // Backend will calculate: balance_score, depth, evidence_used, language_quality, logical_consistency, perspective_switching_ability
+      // Combine pros and cons into a single user_argument field that backend expects
+      // Format it clearly so AI can evaluate both sides
+      const combinedArgument = `PROS ARGUMENT (Arguing FOR the topic):
+${prosArgument || '(No pros argument provided)'}
+
+CONS ARGUMENT (Arguing AGAINST the topic):
+${consArgument || '(No cons argument provided)'}`;
+
+      // Prepare response data matching backend's expected format
+      // Backend ai.service.js buildPrompt() looks for: topic, user_argument
       const responseData = {
-        topic: debateTopic,  // Debate topic/statement
-        pros_text: prosArgument || '',  // Pros arguments text (required)
-        cons_text: consArgument || '',  // Cons arguments text (required)
+        topic: debateTopic,  // Debate topic/statement (required by backend)
+        user_argument: combinedArgument,  // Combined pros + cons arguments (required by backend)
+        // Include additional fields for potential future use or compatibility
+        pros_text: prosArgument || '',  // Keep for reference
+        cons_text: consArgument || '',  // Keep for reference
         num_points_pros: prosPoints,  // Number of pros points
         num_points_cons: consPoints,  // Number of cons points
         time_taken: totalTimeTaken,  // Total time for both arguments (seconds)
-        // Include aliases for compatibility
         debate_statement: debateTopic,  // Alias for topic
         pros_time_taken: finalProsTime,  // Individual time for reference
         cons_time_taken: finalConsTime   // Individual time for reference
